@@ -5,10 +5,10 @@ from Plot.AnimatePlotDriver import CAnimateDriver
 from Plot.PlotDriver import CPlotDriver
 
 if __name__ == "__main__":
-    code = "sz.000001"
-    begin_time = "2018-01-01"
+    code = "BTC/USDT"
+    begin_time = "2024-01-01"
     end_time = None
-    data_src = DATA_SRC.BAO_STOCK
+    data_src = DATA_SRC.PICKLE
     lv_list = [KL_TYPE.K_DAY]
 
     config = CChanConfig({
@@ -79,7 +79,7 @@ if __name__ == "__main__":
             plot_para=plot_para,
         )
         plot_driver.figure.show()
-        plot_driver.save2img("./test.png")
+        plot_driver.save2img("./test2.png")
     else:
         CAnimateDriver(
             chan,

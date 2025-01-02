@@ -30,6 +30,8 @@ class CCXT(CCommonStockApi):
     def get_kl_data(self):
         fields = "time,open,high,low,close"
         exchange = ccxt.binance()
+        exchange.httpsProxy = 'http://192.168.100.240:7890/'
+
         timeframe = self.__convert_type()
         since_date = exchange.parse8601(f'{self.begin_date}T00:00:00')
         data = exchange.fetch_ohlcv(self.code, timeframe, since=since_date)

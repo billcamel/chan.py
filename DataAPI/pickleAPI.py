@@ -58,7 +58,12 @@ class PICKLE_API(CCommonStockApi):
 
     def get_kl_data(self):
         cur_path = os.path.dirname(os.path.realpath(__file__))
-        file_path = f"/home/bill/work/stockquant/instock/cache/hist/{self.code}qfq.gzip.pickle"
+        if self.code.find("/") >=0 or self.code.find("-") >=0: # 加密货币对
+            code = self.code.replace("/","-")
+            file_path = f"/home/bill/work/stockquant/instock/cache/crypto/hist/{code}.gzip.pickle"
+        else:
+            file_path = f"/home/bill/work/stockquant/instock/cache/hist/{self.code}qfq.gzip.pickle"
+
         if not os.path.exists(file_path):
             raise CChanException(f"file not exist: {file_path}", ErrCode.SRC_DATA_NOT_FOUND)
         df = pd.read_pickle(file_path, compression="gzip")
