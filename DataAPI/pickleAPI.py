@@ -61,8 +61,10 @@ class PICKLE_API(CCommonStockApi):
         if self.code.find("/") >=0 or self.code.find("-") >=0: # 加密货币对
             code = self.code.replace("/","-")
             file_path = f"/home/bill/work/stockquant/instock/cache/crypto/hist/{code}.gzip.pickle"
+        elif self.code[:1].isdigit():
+            file_path = f"/home/bill/work/stockquant/instock/cache/cnstock/hist/{self.code}qfq.gzip.pickle"
         else:
-            file_path = f"/home/bill/work/stockquant/instock/cache/hist/{self.code}qfq.gzip.pickle"
+            file_path = f"/home/bill/work/stockquant/instock/cache/usstock/hist/{self.code}qfq.gzip.pickle"
 
         if not os.path.exists(file_path):
             raise CChanException(f"file not exist: {file_path}", ErrCode.SRC_DATA_NOT_FOUND)
