@@ -51,7 +51,18 @@ def stragety_feature(last_klu):
     return {
         "open_klu_rate": (last_klu.close - last_klu.open)/last_klu.open,
     }
-
+def get_market_features(kline_data, idx):
+    """获取市场特征"""
+    cur_kl = kline_data[idx]
+    prev_kl = kline_data[idx-1] if idx > 0 else cur_kl
+    
+    return {
+        "price_change": (cur_kl.close - prev_kl.close) / prev_kl.close,
+        # "volume_change": (cur_kl.volume - prev_kl.volume) / prev_kl.volume if prev_kl.volume > 0 else 0,
+        "amplitude": (cur_kl.high - cur_kl.low) / cur_kl.open,
+        "ma5_deviation": (cur_kl.close - cur_kl.ma5) / cur_kl.ma5 if hasattr(cur_kl, 'ma5') else 0,
+        "ma10_deviation": (cur_kl.close - cur_kl.ma10) / cur_kl.ma10 if hasattr(cur_kl, 'ma10') else 0,
+    }
 
 if __name__ == "__main__":
     """
@@ -93,10 +104,11 @@ if __name__ == "__main__":
     )
 
     bsp_dict: Dict[int, T_SAMPLE_INFO] = {}  # 存储策略产出的bsp的特征
-
+    kline_data = []  # 存储K线数据用于后续分析
     # 跑策略，保存买卖点的特征
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
+        kline_data.append(last_klu)
         bsp_list = chan_snapshot.get_bsp()
         if not bsp_list:
             continue
@@ -110,7 +122,7 @@ if __name__ == "__main__":
                 "is_buy": last_bsp.is_buy,
                 "open_time": last_klu.time,
             }
-            bsp_dict[last_bsp.klu.idx]['feature'].add_feat(stragety_feature(last_klu))  # 开仓K线特征
+            bsp_dict[last_bsp.klu.idx]['feature'].add_feat(get_market_features(kline_data, len(kline_data)-1))  # 开仓K线特征
             print(last_bsp.klu.time, last_bsp.is_buy)
 
     # 生成libsvm样本特征
@@ -142,7 +154,10 @@ if __name__ == "__main__":
 
     # load sample file & train model
     dtrain = xgb.DMatrix("feature.libsvm?format=libsvm")  # load sample
-    param = {'max_depth': 2, 'eta': 0.3, 'objective': 'binary:logistic', 'eval_metric': 'auc'}
+    param = {'max_depth': 3, 
+        'eta': 0.1, 
+        'objective': 'binary:logistic',
+        'eval_metric': ['auc', 'logloss']}
     evals_result = {}
     bst = xgb.train(
         param,
@@ -159,3 +174,12 @@ if __name__ == "__main__":
     model.load_model("model.json")
     # predict
     print(model.predict(dtrain))
+
+    # 输出样本统计信息
+    total_samples = len(bsp_dict)
+    success_samples = sum(1 for s in bsp_dict.keys() if s in bsp_academy)
+    print(f"\n样本统计:")
+    print(f"真样本数: {len(bsp_academy)}")
+    print(f"总样本数: {total_samples}")
+    print(f"成功样本数: {success_samples}")
+    print(f"成功率: {success_samples/total_samples*100:.2f}%")

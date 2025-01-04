@@ -1,6 +1,8 @@
 from Chan import CChan
 from ChanConfig import CChanConfig
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
+from BuySellPoint.BS_Point import CBS_Point
+from BuySellPoint.BSPointList import CBSPointList
 from Plot.AnimatePlotDriver import CAnimateDriver
 from Plot.PlotDriver import CPlotDriver
 
@@ -71,18 +73,26 @@ if __name__ == "__main__":
         config=config,
         autype=AUTYPE.QFQ,
     )
+    for kl_type, ckline in chan.kl_datas.items():
+        for bs in ckline.bs_point_lst.bsp1_list:
+            text = "Buy:" if bs.is_buy else "Sell:"
+            print(text+" " +bs.type2str()+": "+str(bs.klu.time))
+        for bs in ckline.seg_bs_point_lst.bsp1_list:
+            text = "seg Buy:" if bs.is_buy else "seg Sell:"
+            print(text+" " +bs.type2str()+": "+str(bs.klu.time))
 
-    if not config.trigger_step:
-        plot_driver = CPlotDriver(
-            chan,
-            plot_config=plot_config,
-            plot_para=plot_para,
-        )
-        plot_driver.figure.show()
-        plot_driver.save2img("./test2.png")
-    else:
-        CAnimateDriver(
-            chan,
-            plot_config=plot_config,
-            plot_para=plot_para,
-        )
+
+    # if not config.trigger_step:
+    #     plot_driver = CPlotDriver(
+    #         chan,
+    #         plot_config=plot_config,
+    #         plot_para=plot_para,
+    #     )
+    #     plot_driver.figure.show()
+    #     plot_driver.save2img("./test2.png")
+    # else:
+    #     CAnimateDriver(
+    #         chan,
+    #         plot_config=plot_config,
+    #         plot_para=plot_para,
+    #     )

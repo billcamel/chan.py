@@ -7,7 +7,7 @@ sys.path.append(cpath)
 sys.path.append(cpath+"/chan.py")
 
 import xgboost as xgb
-from demo5 import stragety_feature
+from demo5 import get_market_features
 
 from BuySellPoint.BS_Point import CBS_Point
 from Chan import CChan
@@ -63,9 +63,11 @@ if __name__ == "__main__":
     meta = json.load(open("feature.meta", "r"))
 
     treated_bsp_idx = set()
+    kline_data = []  # 存储K线数据用于后续分析
     for chan_snapshot in chan.step_load():
         # 策略逻辑要对齐demo5
         last_klu = chan_snapshot[0][-1][-1]
+        kline_data.append(last_klu)
         bsp_list = chan_snapshot.get_bsp()
         if not bsp_list:
             continue
@@ -75,7 +77,7 @@ if __name__ == "__main__":
         if last_bsp.klu.idx in treated_bsp_idx or cur_lv_chan[-2].idx != last_bsp.klu.klc.idx:
             continue
 
-        last_bsp.features.add_feat(stragety_feature(last_klu))  # 开仓K线特征
+        last_bsp.features.add_feat(get_market_features(kline_data, len(kline_data)-1))  # 开仓K线特征
         # 买卖点打分，应该和demo5最后的predict结果完全一致才对
         print(last_bsp.klu.time, predict_bsp(model, last_bsp, meta))
         treated_bsp_idx.add(last_bsp.klu.idx)
