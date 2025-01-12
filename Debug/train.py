@@ -1,6 +1,7 @@
 import json
 from typing import Dict, TypedDict
 
+import numpy as np
 import xgboost as xgb
 import os,sys
 cpath_current = os.path.dirname(os.path.dirname(__file__))
@@ -14,6 +15,7 @@ from ChanModel.Features import CFeatures
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 from Plot.PlotDriver import CPlotDriver
+from features import get_market_features, save_features, safe_div
 
 
 class T_SAMPLE_INFO(TypedDict):
@@ -51,30 +53,18 @@ def stragety_feature(last_klu):
     return {
         "open_klu_rate": (last_klu.close - last_klu.open)/last_klu.open,
     }
-def get_market_features(kline_data, idx):
-    """获取市场特征"""
-    cur_kl = kline_data[idx]
-    prev_kl = kline_data[idx-1] if idx > 0 else cur_kl
-    
-    return {
-        "price_change": (cur_kl.close - prev_kl.close) / prev_kl.close,
-        # "volume_change": (cur_kl.volume - prev_kl.volume) / prev_kl.volume if prev_kl.volume > 0 else 0,
-        "amplitude": (cur_kl.high - cur_kl.low) / cur_kl.open,
-        "ma5_deviation": (cur_kl.close - cur_kl.ma5) / cur_kl.ma5 if hasattr(cur_kl, 'ma5') else 0,
-        "ma10_deviation": (cur_kl.close - cur_kl.ma10) / cur_kl.ma10 if hasattr(cur_kl, 'ma10') else 0,
-    }
 
 if __name__ == "__main__":
     """
-    本demo主要演示如何记录策略产出的买卖点的特征
-    然后将这些特征作为样本，训练一个模型(以XGB为demo)
-    用于预测买卖点的准确性
+    本示例旨在展示如何收集策略生成的买卖点特征
+    并将这些特征作为样本，用于训练模型（以XGB为示例）
+    从而预测买卖点的准确性
 
-    请注意，demo训练预测都用的是同一份数据，这是不合理的，仅仅是为了演示
+    注意：在本示例中，训练和预测都使用同一份数据，这在实际应用中是不合理的，仅作为示例
     """
     code = "sz.000001"
-    begin_time = "2018-01-01"
-    end_time = None
+    begin_time = "2010-01-01"
+    end_time = "2020-01-01"
     data_src = DATA_SRC.BAO_STOCK
     lv_list = [KL_TYPE.K_DAY]
 
@@ -123,63 +113,70 @@ if __name__ == "__main__":
                 "open_time": last_klu.time,
             }
             bsp_dict[last_bsp.klu.idx]['feature'].add_feat(get_market_features(kline_data, len(kline_data)-1))  # 开仓K线特征
-            print(last_bsp.klu.time, last_bsp.is_buy)
+            # print(last_bsp.klu.time, last_bsp.is_buy)
 
-    # 生成libsvm样本特征
+    # 生成特征数据
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
-    feature_meta = {}  # 特征meta
-    cur_feature_idx = 0
-    plot_marker = {}
-    fid = open("feature.libsvm", "w")
-    for bsp_klu_idx, feature_info in bsp_dict.items():
-        label = int(bsp_klu_idx in bsp_academy)  # 以买卖点识别是否准确为label
-        features = []  # List[(idx, value)]
-        for feature_name, value in feature_info['feature'].items():
-            if feature_name not in feature_meta:
-                feature_meta[feature_name] = cur_feature_idx
-                cur_feature_idx += 1
-            features.append((feature_meta[feature_name], value))
-        features.sort(key=lambda x: x[0])
-        feature_str = " ".join([f"{idx}:{value}" for idx, value in features])
-        fid.write(f"{label} {feature_str}\n")
-        plot_marker[feature_info["open_time"].to_str()] = ("√" if label else "×", "down" if feature_info["is_buy"] else "up")
-    fid.close()
-
-    with open("feature.meta", "w") as fid:
-        # meta保存下来，实盘预测时特征对齐用
-        fid.write(json.dumps(feature_meta))
-
+    plot_marker, feature_meta, X, y = save_features(bsp_dict, bsp_academy)
+    
     # 画图检查label是否正确
     plot(chan, plot_marker)
-
-    # load sample file & train model
-    dtrain = xgb.DMatrix("feature.libsvm?format=libsvm")  # load sample
-    param = {'max_depth': 3, 
-        'eta': 0.1, 
+    
+    # 训练模型参数调整
+    param = {
+        'max_depth': 3,
+        'eta': 0.1,
         'objective': 'binary:logistic',
-        'eval_metric': ['auc', 'logloss']}
-    evals_result = {}
-    bst = xgb.train(
-        param,
-        dtrain=dtrain,
-        num_boost_round=10,
-        evals=[(dtrain, "train")],
-        evals_result=evals_result,
-        verbose_eval=True,
-    )
-    bst.save_model("model.json")
-
-    # load model
-    model = xgb.Booster()
-    model.load_model("model.json")
-    # predict
-    print(model.predict(dtrain))
-
-    # 输出样本统计信息
-    total_samples = len(bsp_dict)
-    success_samples = sum(1 for s in bsp_dict.keys() if s in bsp_academy)
-    print(f"\n样本统计:")
-    print(f"真样本数: {len(bsp_academy)}")
-    print(f"总样本数: {total_samples}")
-    print(f"成功样本数: {success_samples}")
-    print(f"成功率: {success_samples/total_samples*100:.2f}%")
+        'eval_metric': ['auc', 'logloss'],
+        'tree_method': 'hist',
+        'min_child_weight': 1,
+        'subsample': 0.8,
+        'colsample_bytree': 0.8,
+        'scale_pos_weight': 1,
+        'nthread': 4,
+        'seed': 42
+    }
+    
+    # 加载数据并训练
+    try:
+        # 直接使用numpy数组创建DMatrix
+        dtrain = xgb.DMatrix(X, label=y)
+        
+        # 训练模型
+        evals_result = {}
+        bst = xgb.train(
+            param,
+            dtrain=dtrain,
+            num_boost_round=100,
+            evals=[(dtrain, "train")],
+            evals_result=evals_result,
+            verbose_eval=10,
+            early_stopping_rounds=20
+        )
+        
+        # 保存模型
+        bst.save_model("model.json")
+        
+        # 输出特征重要性
+        importance = bst.get_score(importance_type='gain')
+        print("\nFeature Importance:")
+        for fname, imp in sorted(importance.items(), key=lambda x: x[1], reverse=True):
+            feat_idx = int(fname.replace('f', ''))
+            for name, idx in feature_meta.items():
+                if idx == feat_idx:
+                    print(f"{name}: {imp:.2f}")
+        
+        # 预测并计算评估指标
+        predictions = bst.predict(dtrain)
+        from sklearn.metrics import roc_auc_score, accuracy_score
+        auc = roc_auc_score(y, predictions)
+        acc = accuracy_score(y, predictions > 0.5)
+        print(f"\nAUC: {auc:.4f}")
+        print(f"Accuracy: {acc:.4f}")
+        
+        # 保存预测结果
+        np.save("predictions.npy", predictions)
+        
+    except Exception as e:
+        print(f"训练过程出错: {str(e)}")
+        raise

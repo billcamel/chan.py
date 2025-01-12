@@ -1,51 +1,62 @@
 import json
 from typing import Dict, TypedDict
 import os,sys
+import numpy as np
+import xgboost as xgb
+
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
 sys.path.append(cpath+"/chan.py")
 
-import xgboost as xgb
-from demo5 import get_market_features
-
-from BuySellPoint.BS_Point import CBS_Point
 from Chan import CChan
 from ChanConfig import CChanConfig
-from ChanModel.Features import CFeatures
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 
-
-class T_SAMPLE_INFO(TypedDict):
-    feature: CFeatures
-    is_buy: bool
-    open_time: CTime
+# 导入特征计算相关函数
+from features import get_market_features, safe_div, FeatureProcessor
 
 
-def predict_bsp(model: xgb.Booster, last_bsp: CBS_Point, meta: Dict[str, int]):
-    missing = -9999999
-    feature_arr = [missing] * len(meta)
-    for feat_name, feat_value in last_bsp.features.items():
-        if feat_name in meta:
-            feature_arr[meta[feat_name]] = feat_value
-    feature_arr = [feature_arr]
-    dtest = xgb.DMatrix(feature_arr, missing=missing)
-    return model.predict(dtest)
-
+def predict_bsp(model: xgb.Booster, features: Dict[str, float], feature_meta: Dict[str, int], processor: FeatureProcessor) -> float:
+    """预测买卖点的概率
+    
+    Args:
+        model: 训练好的XGBoost模型
+        features: 特征字典
+        feature_meta: 特征映射信息
+        processor: 特征处理器
+        
+    Returns:
+        float: 预测的概率值
+    """
+    # 特征归一化
+    scaled_features = processor.transform_dict(features)
+    
+    # 构建特征向量
+    X = np.zeros(len(feature_meta))
+    for feat_name, value in scaled_features.items():
+        if feat_name in feature_meta:
+            X[feature_meta[feat_name]] = value
+            
+    # 转换为DMatrix
+    dtest = xgb.DMatrix(X.reshape(1, -1))
+    
+    # 预测
+    return model.predict(dtest)[0]
 
 if __name__ == "__main__":
     """
-    本demo主要演示如何在实盘中把策略产出的买卖点，对接到demo5中训练好的离线模型上
+    本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
     code = "sz.000001"
-    begin_time = "2018-01-01"
+    begin_time = "2020-01-01"
     end_time = None
     data_src = DATA_SRC.BAO_STOCK
     lv_list = [KL_TYPE.K_DAY]
 
     config = CChanConfig({
-        "trigger_step": True,  # 打开开关！
+        "trigger_step": True,
     })
 
     chan = CChan(
@@ -58,14 +69,20 @@ if __name__ == "__main__":
         autype=AUTYPE.QFQ,
     )
 
+    # 加载模型和特征映射
     model = xgb.Booster()
     model.load_model("model.json")
-    meta = json.load(open("feature.meta", "r"))
+    with open("feature.meta", "r") as f:
+        feature_meta = json.load(f)
+    processor = FeatureProcessor.load("feature_processor.joblib")
 
     treated_bsp_idx = set()
     kline_data = []  # 存储K线数据用于后续分析
+    
+    # 记录交易结果
+    trades = []
+    
     for chan_snapshot in chan.step_load():
-        # 策略逻辑要对齐demo5
         last_klu = chan_snapshot[0][-1][-1]
         kline_data.append(last_klu)
         bsp_list = chan_snapshot.get_bsp()
@@ -77,7 +94,73 @@ if __name__ == "__main__":
         if last_bsp.klu.idx in treated_bsp_idx or cur_lv_chan[-2].idx != last_bsp.klu.klc.idx:
             continue
 
-        last_bsp.features.add_feat(get_market_features(kline_data, len(kline_data)-1))  # 开仓K线特征
-        # 买卖点打分，应该和demo5最后的predict结果完全一致才对
-        print(last_bsp.klu.time, predict_bsp(model, last_bsp, meta))
+        # 计算特征
+        features = get_market_features(kline_data, len(kline_data)-1)
+        
+        # 预测买卖点的概率
+        prob = predict_bsp(model, features, feature_meta, processor)
+        
+        # 记录交易信息
+        trade_info = {
+            'time': last_bsp.klu.time.to_str(),
+            'is_buy': last_bsp.is_buy,
+            'prob': prob,
+            'price': last_klu.close,
+            'idx': last_bsp.klu.idx
+        }
+        trades.append(trade_info)
+        
+        # 打印交易信息
+        trade_type = "买入" if last_bsp.is_buy else "卖出"
+        print(f"{trade_info['time']}: {trade_type} 信号, 预测概率={prob:.2%}, 价格={trade_info['price']:.2f}")
+        
         treated_bsp_idx.add(last_bsp.klu.idx)
+    
+    # 获取实际买卖点
+    bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
+    
+    # 计算高概率信号
+    threshold = 0.6
+    high_prob_trades = [t for t in trades if t['prob'] > threshold]
+    
+    # 统计信号
+    print("\n交易统计:")
+    print(f"总信号数: {len(trades)}")
+    print(f"买入信号: {sum(1 for t in trades if t['is_buy'])}")
+    print(f"卖出信号: {sum(1 for t in trades if not t['is_buy'])}")
+    
+    print(f"\n高概率信号 (>{threshold:.0%}):")
+    print(f"总数: {len(high_prob_trades)}")
+    print(f"买入: {sum(1 for t in high_prob_trades if t['is_buy'])}")
+    print(f"卖出: {sum(1 for t in high_prob_trades if not t['is_buy'])}")
+    
+    # 分析预测准确性
+    print("\n预测准确性分析:")
+    print(f"实际买卖点数量: {len(bsp_academy)}")
+    
+    # 统计高概率信号中实际买卖点的数量
+    correct_predictions = 0
+    for trade in high_prob_trades:
+        if trade['idx'] in bsp_academy:
+            correct_predictions += 1
+    
+    # 计算准确率
+    precision = correct_predictions / len(high_prob_trades) if high_prob_trades else 0
+    recall = correct_predictions / len(bsp_academy) if bsp_academy else 0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+    
+    print(f"高概率信号准确率: {precision:.2%}")  # 在预测为正的样本中实际为正的比例
+    print(f"实际信号召回率: {recall:.2%}")      # 实际为正的样本中被预测为正的比例
+    print(f"F1分数: {f1:.2%}")                 # 准确率和召回率的调和平均
+    
+    # 按时间顺序输出详细的高概率信号分析
+    print("\n高概率信号详细分析:")
+    print("时间\t\t类型\t概率\t是否正确\tK线索引")
+    print("-" * 60)
+    for trade in high_prob_trades:
+        trade_type = "买入" if trade['is_buy'] else "卖出"
+        is_correct = trade['idx'] in bsp_academy
+        correct_mark = "√" if is_correct else "×"
+        print(f"{trade['time']}\t{trade_type}\t{trade['prob']:.2%}\t{correct_mark}\t{trade['idx']}")
+
+
