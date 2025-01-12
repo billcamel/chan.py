@@ -15,7 +15,8 @@ from ChanModel.Features import CFeatures
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 from Plot.PlotDriver import CPlotDriver
-from features import get_market_features, save_features, safe_div
+from models import get_market_features, save_features
+from models.trainer import ModelTrainer
 
 
 class T_SAMPLE_INFO(TypedDict):
@@ -122,61 +123,57 @@ if __name__ == "__main__":
     # 画图检查label是否正确
     plot(chan, plot_marker)
     
-    # 训练模型参数调整
-    param = {
-        'max_depth': 3,
-        'eta': 0.1,
-        'objective': 'binary:logistic',
-        'eval_metric': ['auc', 'logloss'],
-        'tree_method': 'hist',
-        'min_child_weight': 1,
-        'subsample': 0.8,
-        'colsample_bytree': 0.8,
-        'scale_pos_weight': 1,
-        'nthread': 4,
-        'seed': 42
-    }
+    # 训练模型
+    trainer = ModelTrainer()
     
-    # 加载数据并训练
-    try:
-        # 直接使用numpy数组创建DMatrix
-        dtrain = xgb.DMatrix(X, label=y)
+    # 特征选择
+    selected_features = trainer.select_features(X, y, list(feature_meta.keys()))
+    
+    # 参数调优
+    best_params = trainer.tune_parameters(X, y)
+    trainer.params.update(best_params)
+    
+    # 交叉验证
+    cv_metrics = trainer.cross_validate(X, y)
+    print("\n交叉验证结果:")
+    for metric, value in cv_metrics.items():
+        print(f"{metric}: {value:.4f}")
+    
+    # 训练最终模型
+    metrics = trainer.train(X, y, selected_features)
+    
+    # 绘制评估图
+    trainer.plot_model_evaluation(X, y)
+    
+    # 输出训练和验证集评估指标
+    print("\n训练集评估指标:")
+    for name, value in metrics['train'].items():
+        print(f"{name}: {value:.4f}")
         
-        # 训练模型
-        evals_result = {}
-        bst = xgb.train(
-            param,
-            dtrain=dtrain,
-            num_boost_round=100,
-            evals=[(dtrain, "train")],
-            evals_result=evals_result,
-            verbose_eval=10,
-            early_stopping_rounds=20
-        )
-        
-        # 保存模型
-        bst.save_model("model.json")
-        
-        # 输出特征重要性
-        importance = bst.get_score(importance_type='gain')
-        print("\nFeature Importance:")
-        for fname, imp in sorted(importance.items(), key=lambda x: x[1], reverse=True):
-            feat_idx = int(fname.replace('f', ''))
-            for name, idx in feature_meta.items():
-                if idx == feat_idx:
-                    print(f"{name}: {imp:.2f}")
-        
-        # 预测并计算评估指标
-        predictions = bst.predict(dtrain)
-        from sklearn.metrics import roc_auc_score, accuracy_score
-        auc = roc_auc_score(y, predictions)
-        acc = accuracy_score(y, predictions > 0.5)
-        print(f"\nAUC: {auc:.4f}")
-        print(f"Accuracy: {acc:.4f}")
-        
-        # 保存预测结果
-        np.save("predictions.npy", predictions)
-        
-    except Exception as e:
-        print(f"训练过程出错: {str(e)}")
-        raise
+    print("\n验证集评估指标:")
+    for name, value in metrics['val'].items():
+        print(f"{name}: {value:.4f}")
+    
+    # 绘制训练曲线
+    trainer.plot_training_curves()
+    
+    # 绘制特征重要性图
+    trainer.plot_feature_importance()
+    
+    # 保存模型
+    if hasattr(trainer.model, '_Booster'):
+        trainer.model._Booster.save_model("model.json")  # 保存内部的Booster模型
+    else:
+        trainer.model.save_model("model.json")
+    
+    # 分析特征
+    trainer.analyze_features(X, y, list(feature_meta.keys()))
+    
+    # 计算预测置信区间
+    mean_pred, conf_interval = trainer.predict_with_confidence(X)
+    print("\n预测置信区间示例:")
+    for i in range(min(5, len(mean_pred))):
+        print(f"样本 {i}: {mean_pred[i]:.4f} ± {conf_interval[i]:.4f}")
+    
+    # # 暂时注释掉SHAP分析，需要安装shap包才能使用
+    # trainer.explain_predictions(X, list(feature_meta.keys()))

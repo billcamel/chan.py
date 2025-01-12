@@ -49,7 +49,7 @@ class PICKLE_API(CCommonStockApi):
             DATA_FIELD.FIELD_HIGH,
             DATA_FIELD.FIELD_LOW,
             DATA_FIELD.FIELD_CLOSE,
-            # DATA_FIELD.FIELD_VOLUME,
+            DATA_FIELD.FIELD_VOLUME,
             # DATA_FIELD.FIELD_TURNOVER,
             # DATA_FIELD.FIELD_TURNRATE,
         ]  # 每一列字段
@@ -62,9 +62,9 @@ class PICKLE_API(CCommonStockApi):
             code = self.code.replace("/","-")
             file_path = f"/home/bill/work/stockquant/instock/cache/crypto/hist/{code}.gzip.pickle"
         elif self.code[:1].isdigit():
-            file_path = f"/home/bill/work/stockquant/instock/cache/cnstock/hist/{self.code}qfq.gzip.pickle"
+            file_path = f"/Users/bill/work/stock/instock/cache/hist/{self.code}qfq.gzip.pickle"
         else:
-            file_path = f"/home/bill/work/stockquant/instock/cache/usstock/hist/{self.code}qfq.gzip.pickle"
+            file_path = f"/home/bill/work/stock/instock/cache/usstock/hist/{self.code}qfq.gzip.pickle"
 
         if not os.path.exists(file_path):
             raise CChanException(f"file not exist: {file_path}", ErrCode.SRC_DATA_NOT_FOUND)

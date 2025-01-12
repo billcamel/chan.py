@@ -15,7 +15,8 @@ from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 
 # 导入特征计算相关函数
-from features import get_market_features, safe_div, FeatureProcessor
+from models import get_market_features, FeatureProcessor
+from models.trainer import ModelEvaluator
 
 
 def predict_bsp(model: xgb.Booster, features: Dict[str, float], feature_meta: Dict[str, int], processor: FeatureProcessor) -> float:
@@ -119,44 +120,36 @@ if __name__ == "__main__":
     # 获取实际买卖点
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
     
-    # 计算高概率信号
-    threshold = 0.6
-    high_prob_trades = [t for t in trades if t['prob'] > threshold]
+    # 评估结果
+    evaluator = ModelEvaluator("model.json", threshold=0.6)
+    stats = evaluator.evaluate_trades(trades, bsp_academy)
     
-    # 统计信号
+    # 输出评估结果
     print("\n交易统计:")
-    print(f"总信号数: {len(trades)}")
-    print(f"买入信号: {sum(1 for t in trades if t['is_buy'])}")
-    print(f"卖出信号: {sum(1 for t in trades if not t['is_buy'])}")
+    print(f"总信号数: {stats['total_signals']}")
+    print(f"买入信号: {stats['buy_signals']}")
+    print(f"卖出信号: {stats['sell_signals']}")
     
-    print(f"\n高概率信号 (>{threshold:.0%}):")
-    print(f"总数: {len(high_prob_trades)}")
-    print(f"买入: {sum(1 for t in high_prob_trades if t['is_buy'])}")
-    print(f"卖出: {sum(1 for t in high_prob_trades if not t['is_buy'])}")
+    print(f"\n高概率信号 (>{evaluator.threshold:.0%}):")
+    print(f"总数: {stats['high_prob_signals']}")
+    print(f"买入: {stats['high_prob_buy']}")
+    print(f"卖出: {stats['high_prob_sell']}")
     
-    # 分析预测准确性
     print("\n预测准确性分析:")
-    print(f"实际买卖点数量: {len(bsp_academy)}")
+    print(f"实际买卖点数量: {stats['actual_points']}")
+    print(f"高概率信号准确率: {stats['precision']:.2%}")
+    print(f"实际信号召回率: {stats['recall']:.2%}")
+    print(f"F1分数: {stats['f1']:.2%}")
     
-    # 统计高概率信号中实际买卖点的数量
-    correct_predictions = 0
-    for trade in high_prob_trades:
-        if trade['idx'] in bsp_academy:
-            correct_predictions += 1
-    
-    # 计算准确率
-    precision = correct_predictions / len(high_prob_trades) if high_prob_trades else 0
-    recall = correct_predictions / len(bsp_academy) if bsp_academy else 0
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-    
-    print(f"高概率信号准确率: {precision:.2%}")  # 在预测为正的样本中实际为正的比例
-    print(f"实际信号召回率: {recall:.2%}")      # 实际为正的样本中被预测为正的比例
-    print(f"F1分数: {f1:.2%}")                 # 准确率和召回率的调和平均
+    print("\n买卖点分类准确率:")
+    print(f"买入点准确率: {stats['buy_precision']:.2%}")
+    print(f"卖出点准确率: {stats['sell_precision']:.2%}")
     
     # 按时间顺序输出详细的高概率信号分析
     print("\n高概率信号详细分析:")
     print("时间\t\t类型\t概率\t是否正确\tK线索引")
     print("-" * 60)
+    high_prob_trades = [t for t in trades if t['prob'] > evaluator.threshold]
     for trade in high_prob_trades:
         trade_type = "买入" if trade['is_buy'] else "卖出"
         is_correct = trade['idx'] in bsp_academy

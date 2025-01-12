@@ -1,8 +1,112 @@
 """特征工程相关的公共函数"""
 import numpy as np
-import talib as ta
+import talib
 from typing import Dict, List, Any
 from sklearn.preprocessing import StandardScaler, RobustScaler
+import pandas as pd
+import json
+
+def safe_div(a, b, default=0):
+    """安全除法,避免除0错误"""
+    try:
+        if abs(b) < 1e-10:  # 分母太小
+            return default
+        return float(a) / float(b)
+    except:
+        return default
+
+def get_technical_features(df: pd.DataFrame) -> pd.DataFrame:
+    """计算技术指标"""
+    try:
+        # 趋势指标
+        for period in [5, 10, 20, 60]:
+            df[f'sma{period}'] = talib.SMA(df.close, timeperiod=period)
+            df[f'ema{period}'] = talib.EMA(df.close, timeperiod=period)
+        
+        # MACD
+        macd, signal, hist = talib.MACD(df.close)
+        df['macd'] = macd
+        df['macd_signal'] = signal
+        df['macd_hist'] = hist
+        
+        # RSI
+        for period in [6, 12, 24]:
+            df[f'rsi_{period}'] = talib.RSI(df.close, timeperiod=period)
+        
+        # 布林带
+        upper, middle, lower = talib.BBANDS(df.close)
+        df['boll'] = middle
+        df['boll_ub'] = upper
+        df['boll_lb'] = lower
+        df['boll_width'] = (upper - lower) / middle
+        df['boll_position'] = (df.close - lower) / (upper - lower)
+        
+        # KDJ
+        slowk, slowd = talib.STOCH(df.high, df.low, df.close)
+        df['kdj_k'] = slowk
+        df['kdj_d'] = slowd
+        df['kdj_j'] = 3 * slowk - 2 * slowd
+        
+        # 成交量
+        df['volume_sma5'] = talib.SMA(df.volume, timeperiod=5)
+        df['volume_sma10'] = talib.SMA(df.volume, timeperiod=10)
+        df['obv'] = talib.OBV(df.close, df.volume)
+        df['ad'] = talib.AD(df.high, df.low, df.close, df.volume)
+        df['volume_delta'] = df.volume.diff()
+        df['volume_relative'] = df.volume / df.volume.rolling(window=20).mean()
+        
+        # ATR
+        df['atr'] = talib.ATR(df.high, df.low, df.close)
+        df['atr_ratio'] = df['atr'] / df.close
+        
+        # DMI
+        df['plus_di'] = talib.PLUS_DI(df.high, df.low, df.close)
+        df['minus_di'] = talib.MINUS_DI(df.high, df.low, df.close)
+        df['adx'] = talib.ADX(df.high, df.low, df.close)
+        
+        # 动量指标
+        df['cci'] = talib.CCI(df.high, df.low, df.close)
+        df['mfi'] = talib.MFI(df.high, df.low, df.close, df.volume)
+        df['roc'] = talib.ROC(df.close)
+        df['willr'] = talib.WILLR(df.high, df.low, df.close)
+        
+        return df
+        
+    except Exception as e:
+        print(f"计算技术指标出错: {str(e)}")
+        return df
+
+class StockFeatureEngine:
+    """股票特征工程引擎"""
+    
+    def __init__(self):
+        self.feature_processor = get_technical_features
+        
+    def transform(self, kline_data: List) -> pd.DataFrame:
+        """转换K线数据为特征DataFrame"""
+        # 转换为DataFrame
+        df = pd.DataFrame({
+            'open': [kl.open for kl in kline_data],
+            'high': [kl.high for kl in kline_data],
+            'low': [kl.low for kl in kline_data],
+            'close': [kl.close for kl in kline_data],
+            'volume': [kl.trade_info.metric['volume'] for kl in kline_data]
+        })
+        
+        # 计算技术指标
+        try:
+            df = self.feature_processor(df)
+        except Exception as e:
+            print(f"特征处理出错: {str(e)}")
+            
+        return df
+        
+    def get_features(self, kline_data: List, idx: int) -> Dict[str, float]:
+        """获取某个时间点的所有特征"""
+        df = self.transform(kline_data)
+        features = df.iloc[idx].to_dict()
+        # 移除NaN值
+        return {k: v for k, v in features.items() if pd.notna(v)}
 
 class FeatureProcessor:
     """特征处理器"""
@@ -82,104 +186,8 @@ class FeatureProcessor:
         processor.feature_names = data['feature_names']
         return processor
 
-def safe_div(a, b, default=0):
-    """安全除法,避免除0错误"""
-    try:
-        if abs(b) < 1e-10:  # 分母太小
-            return default
-        return float(a) / float(b)
-    except:
-        return default
-
-def get_ta_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
-    """使用TA-Lib计算技术指标特征
-    
-    Args:
-        kline_data: K线数据列表
-        idx: 当前K线索引
-        
-    Returns:
-        dict: 技术指标特征字典
-    """
-    if idx < 33:  # 需要足够的历史数据来计算指标
-        return {}
-        
-    # 准备数据
-    close = np.array([k.close for k in kline_data[max(0, idx-100):idx+1]])
-    high = np.array([k.high for k in kline_data[max(0, idx-100):idx+1]])
-    low = np.array([k.low for k in kline_data[max(0, idx-100):idx+1]])
-    volume = np.array([k.trade_info.metric['volume'] for k in kline_data[max(0, idx-100):idx+1]])
-    
-    features = {}
-    
-    try:
-        # 趋势指标
-        sma_periods = [5, 10, 20, 60]
-        for period in sma_periods:
-            sma = ta.SMA(close, timeperiod=period)
-            features[f'sma{period}'] = sma[-1]
-            features[f'sma{period}_slope'] = (sma[-1] - sma[-2]) / sma[-2] if len(sma) > 1 else 0
-        
-        # MACD指标
-        macd, macd_signal, macd_hist = ta.MACD(close)
-        features.update({
-            'macd': macd[-1],
-            'macd_signal': macd_signal[-1],
-            'macd_hist': macd_hist[-1],
-            'macd_hist_slope': (macd_hist[-1] - macd_hist[-2]) / abs(macd_hist[-2]) if len(macd_hist) > 1 and macd_hist[-2] != 0 else 0
-        })
-        
-        # RSI指标
-        for period in [6, 12, 24]:
-            rsi = ta.RSI(close, timeperiod=period)
-            features[f'rsi{period}'] = rsi[-1]
-        
-        # 布林带指标
-        upperband, middleband, lowerband = ta.BBANDS(close, timeperiod=20)
-        features.update({
-            'bb_upper': upperband[-1],
-            'bb_middle': middleband[-1],
-            'bb_lower': lowerband[-1],
-            'bb_width': (upperband[-1] - lowerband[-1]) / middleband[-1],
-            'bb_position': (close[-1] - lowerband[-1]) / (upperband[-1] - lowerband[-1]) if upperband[-1] != lowerband[-1] else 0.5
-        })
-        
-        # KDJ指标
-        slowk, slowd = ta.STOCH(high, low, close)
-        features.update({
-            'kdj_k': slowk[-1],
-            'kdj_d': slowd[-1],
-            'kdj_j': 3 * slowk[-1] - 2 * slowd[-1]
-        })
-        
-        # 成交量指标
-        features.update({
-            'volume_sma5': ta.SMA(volume, timeperiod=5)[-1],
-            'volume_sma10': ta.SMA(volume, timeperiod=10)[-1],
-            'obv': ta.OBV(close, volume)[-1],
-            'ad': ta.AD(high, low, close, volume)[-1]
-        })
-        
-        # ATR指标
-        atr = ta.ATR(high, low, close, timeperiod=14)
-        features['atr'] = atr[-1]
-        features['atr_ratio'] = atr[-1] / close[-1]
-        
-        # DMI指标
-        plus_di = ta.PLUS_DI(high, low, close, timeperiod=14)
-        minus_di = ta.MINUS_DI(high, low, close, timeperiod=14)
-        adx = ta.ADX(high, low, close, timeperiod=14)
-        features.update({
-            'plus_di': plus_di[-1],
-            'minus_di': minus_di[-1],
-            'adx': adx[-1]
-        })
-        
-    except Exception as e:
-        print(f"计算技术指标出错: {str(e)}")
-        return {}
-        
-    return features
+# 创建全局特征引擎实例
+feature_engine = StockFeatureEngine()
 
 def get_market_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
     """获取市场特征
@@ -204,32 +212,11 @@ def get_market_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
         "body_size": safe_div(abs(cur_kl.close - cur_kl.open), cur_kl.open),
     }
     
-    # 趋势特征
-    lookback = min(20, idx+1)  # 最多看前20根K线
-    if lookback >= 2:
-        hist_kls = kline_data[idx-lookback+1:idx+1]
-        high_prices = [kl.high for kl in hist_kls]
-        low_prices = [kl.low for kl in hist_kls]
-        close_prices = [kl.close for kl in hist_kls]
-        
-        features.update({
-            "price_highest_ratio": safe_div(cur_kl.close - max(high_prices[:-1]), max(high_prices[:-1])),
-            "price_lowest_ratio": safe_div(cur_kl.close - min(low_prices[:-1]), min(low_prices[:-1])),
-            "trend_strength": safe_div(close_prices[-1] - close_prices[0], close_prices[0]),
-            "volatility": safe_div(max(high_prices) - min(low_prices), min(low_prices))
-        })
+    # 获取技术指标特征
+    if idx >= 33:  # 确保有足够的历史数据
+        ta_features = feature_engine.get_features(kline_data, idx)
+        features.update(ta_features)
     
-    # 添加TA-Lib计算的技术指标特征
-    ta_features = get_ta_features(kline_data, idx)
-    features.update(ta_features)
-    
-    # 确保所有特征都是float类型
-    for k, v in features.items():
-        try:
-            features[k] = float(v)
-        except (TypeError, ValueError):
-            features[k] = 0.0
-            
     return features
 
 def save_features(bsp_dict: Dict, bsp_academy: List[int]):
@@ -245,8 +232,6 @@ def save_features(bsp_dict: Dict, bsp_academy: List[int]):
         X: 特征矩阵
         y: 标签数组
     """
-    import json
-    
     # 收集所有特征名
     feature_meta = {}
     cur_feature_idx = 0
@@ -297,12 +282,8 @@ def save_features(bsp_dict: Dict, bsp_academy: List[int]):
         print("警告: 特征矩阵包含Inf值")
     
     # 特征归一化
-    processor = FeatureProcessor()
-    processor.fit(X, list(feature_meta.keys()))
-    X = processor.transform(X)
-    
-    # 保存特征处理器
-    processor.save("feature_processor.joblib")
+    scaler = RobustScaler()
+    X = scaler.fit_transform(X)
     
     # 保存特征meta
     with open("feature.meta", "w") as fid:
