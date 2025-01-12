@@ -14,6 +14,31 @@ def safe_div(a, b, default=0):
     except:
         return default
 
+def normalize_price(price_list: List[float], window: int = 20) -> List[float]:
+    """对价格序列进行归一化处理
+    
+    Args:
+        price_list: 价格序列
+        window: 归一化窗口大小
+        
+    Returns:
+        归一化后的价格序列
+    """
+    normalized = []
+    for i in range(len(price_list)):
+        start_idx = max(0, i - window + 1)
+        window_prices = price_list[start_idx:i + 1]
+        if not window_prices:
+            normalized.append(0)
+            continue
+        window_mean = np.mean(window_prices)
+        window_std = np.std(window_prices)
+        if window_std == 0:
+            normalized.append(0)
+        else:
+            normalized.append((price_list[i] - window_mean) / window_std)
+    return normalized
+
 def get_market_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
     """获取市场特征
     
@@ -24,23 +49,47 @@ def get_market_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
     Returns:
         dict: 特征字典
     """
-    cur_kl = kline_data[idx]
-    prev_kl = kline_data[idx-1] if idx > 0 else cur_kl
+    if idx < 20:  # 需要至少20根K线的历史数据
+        return {}
+        
+    # 提取价格序列
+    close_prices = [k.close for k in kline_data[:idx+1]]
+    high_prices = [k.high for k in kline_data[:idx+1]]
+    low_prices = [k.low for k in kline_data[:idx+1]]
     
-    # 基础价格特征
+    # 归一化处理
+    norm_close = normalize_price(close_prices)
+    norm_high = normalize_price(high_prices)
+    norm_low = normalize_price(low_prices)
+    
+    # 计算技术指标时使用归一化后的价格
     features = {
-        # K线基本形态特征
-        "price_change": safe_div(cur_kl.close - prev_kl.close, prev_kl.close),
-        "amplitude": safe_div(cur_kl.high - cur_kl.low, cur_kl.open),
-        "upper_shadow": safe_div(cur_kl.high - max(cur_kl.open, cur_kl.close), cur_kl.open),
-        "lower_shadow": safe_div(min(cur_kl.open, cur_kl.close) - cur_kl.low, cur_kl.open),
-        "body_size": safe_div(abs(cur_kl.close - cur_kl.open), cur_kl.open),
+        'norm_close': norm_close[-1],
+        'norm_high': norm_high[-1],
+        'norm_low': norm_low[-1],
+        'price_std_20': np.std(norm_close[-20:]),
+        'price_trend_20': (norm_close[-1] - norm_close[-20]) if len(norm_close) >= 20 else 0,
+        'vol_std_20': np.std([k.trade_info.metric['volume'] for k in kline_data[idx-19:idx+1]]) if idx >= 19 else 0,
+        'vol_trend_20': (kline_data[idx].trade_info.metric['volume'] - kline_data[idx-19].trade_info.metric['volume']) if idx >= 19 else 0,
     }
     
-    # 获取技术指标特征
-    if idx >= 33:  # 确保有足够的历史数据
-        ta_features = feature_engine.get_features(kline_data, idx)
-        features.update(ta_features)
+    # 添加移动平均相关特征
+    for period in [5, 10, 20]:
+        if len(norm_close) >= period:
+            ma = np.mean(norm_close[-period:])
+            features.update({
+                f'ma{period}': ma,
+                f'ma{period}_slope': (ma - np.mean(norm_close[-period-1:-1])) if len(norm_close) > period else 0,
+                f'price_ma{period}_diff': norm_close[-1] - ma
+            })
+    
+    # 添加波动率特征
+    for period in [5, 10, 20]:
+        if len(norm_high) >= period and len(norm_low) >= period:
+            features[f'atr{period}'] = np.mean([
+                norm_high[i] - norm_low[i] 
+                for i in range(-period, 0)
+            ])
     
     return features
 
