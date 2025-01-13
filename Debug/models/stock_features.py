@@ -40,8 +40,8 @@ def get_technical_features(df: pd.DataFrame) -> pd.DataFrame:
         df['volume_sma10'] = talib.SMA(df.volume, timeperiod=10)
         df['obv'] = talib.OBV(df.close, df.volume)
         df['ad'] = talib.AD(df.high, df.low, df.close, df.volume)
-        df['volume_delta'] = df.volume.diff()
-        df['volume_relative'] = df.volume / df.volume.rolling(window=20).mean()
+        # df['volume_delta'] = df.volume.diff()
+        # df['volume_relative'] = df.volume / df.volume.rolling(window=20).mean()
         
         # ATR
         df['atr'] = talib.ATR(df.high, df.low, df.close)
@@ -76,7 +76,7 @@ class StockFeatureEngine:
             'high': [kl.high for kl in kline_data],
             'low': [kl.low for kl in kline_data],
             'close': [kl.close for kl in kline_data],
-            'volume': [kl.trade_info.metric['volume'] for kl in kline_data]
+            # 'volume': [kl.trade_info.metric['volume'] for kl in kline_data]
         })
         
         try:

@@ -69,8 +69,8 @@ def get_market_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
         'norm_low': norm_low[-1],
         'price_std_20': np.std(norm_close[-20:]),
         'price_trend_20': (norm_close[-1] - norm_close[-20]) if len(norm_close) >= 20 else 0,
-        'vol_std_20': np.std([k.trade_info.metric['volume'] for k in kline_data[idx-19:idx+1]]) if idx >= 19 else 0,
-        'vol_trend_20': (kline_data[idx].trade_info.metric['volume'] - kline_data[idx-19].trade_info.metric['volume']) if idx >= 19 else 0,
+        # 'vol_std_20': np.std([k.trade_info.metric['volume'] for k in kline_data[idx-19:idx+1]]) if idx >= 19 else 0,
+        # 'vol_trend_20': (kline_data[idx].trade_info.metric['volume'] - kline_data[idx-19].trade_info.metric['volume']) if idx >= 19 else 0,
     }
     
     # 添加移动平均相关特征

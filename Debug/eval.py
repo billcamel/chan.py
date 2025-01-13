@@ -50,10 +50,12 @@ if __name__ == "__main__":
     """
     本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
-    code = "sz.000001"
+    code = "BTC/USDT"
     begin_time = "2020-01-01"
     end_time = None
-    data_src = DATA_SRC.BAO_STOCK
+    # begin_time = "2010-01-01"
+    # end_time = "2020-01-01"
+    data_src = DATA_SRC.CCXT
     lv_list = [KL_TYPE.K_DAY]
 
     config = CChanConfig({
