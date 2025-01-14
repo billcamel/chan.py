@@ -64,10 +64,11 @@ if __name__ == "__main__":
     注意：在本示例中，训练和预测都使用同一份数据，这在实际应用中是不合理的，仅作为示例
     """
     code = "BTC/USDT"
-    begin_time = "2010-01-01"
-    end_time = "2020-01-01"
-    data_src = DATA_SRC.CCXT
-    lv_list = [KL_TYPE.K_DAY]
+    begin_time = "2020-01-01"
+    end_time = "2022-01-01"
+    # end_time = "2024-01-01"
+    data_src = DATA_SRC.PICKLE
+    lv_list = [KL_TYPE.K_60M]
 
     config = CChanConfig({
         "trigger_step": True,  # 打开开关！
