@@ -62,7 +62,7 @@ class PICKLE_API(CCommonStockApi):
             code = self.code.replace("/","-")
             file_path = f"/home/bill/work/stockquant/instock/cache/crypto/hist/{code}.gzip.pickle"
         elif self.code[:1].isdigit():
-            file_path = f"/Users/bill/work/stockquant/instock/cache/cnstock/hist/{self.code}qfq.gzip.pickle"
+            file_path = f"/home/bill/work/stockquant/instock/cache/cnstock/hist/{self.code}qfq.gzip.pickle"
         else:
             file_path = f"/home/bill/work/stockquant/instock/cache/usstock/hist/{self.code}qfq.gzip.pickle"
 
