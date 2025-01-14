@@ -63,10 +63,10 @@ if __name__ == "__main__":
 
     注意：在本示例中，训练和预测都使用同一份数据，这在实际应用中是不合理的，仅作为示例
     """
-    code = "sz.000001"
+    code = "BTC/USDT"
     begin_time = "2010-01-01"
     end_time = "2020-01-01"
-    data_src = DATA_SRC.BAO_STOCK
+    data_src = DATA_SRC.CCXT
     lv_list = [KL_TYPE.K_DAY]
 
     config = CChanConfig({
