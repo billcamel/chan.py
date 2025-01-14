@@ -43,6 +43,9 @@ def parse_time_column(inp):
 
 
 class PICKLE_API(CCommonStockApi):
+    # 数据文件根目录
+    DATA_ROOT_PATH = "/Users/zhoulj/work/qdata/data"
+    
     def __init__(self, code, k_type=KL_TYPE.K_DAY, begin_date=None, end_date=None, autype=None):
         self.columns = [
             DATA_FIELD.FIELD_TIME,
@@ -58,8 +61,6 @@ class PICKLE_API(CCommonStockApi):
         super(PICKLE_API, self).__init__(code, k_type, begin_date, end_date, autype)
 
     def get_kl_data(self):
-        cur_path = os.path.dirname(os.path.realpath(__file__))
-        
         # 周期到文件夹名称的映射
         period_map = {
             KL_TYPE.K_DAY: "daily",
@@ -78,11 +79,11 @@ class PICKLE_API(CCommonStockApi):
         # 根据代码类型和周期生成文件路径
         if self.code.find("/") >= 0 or self.code.find("-") >= 0:  # 加密货币对
             codestr = self.code.replace("/","-") 
-            file_path = f"/Users/zhoulj/work/qdata/data/CRYPTO/{period}/{codestr}.pkl"
+            file_path = f"{self.DATA_ROOT_PATH}/CRYPTO/{period}/{codestr}.pkl"
         elif self.code[:1].isdigit():  # A股
-            file_path = f"/Users/zhoulj/work/qdata/data/CN/{period}/{self.code}.pkl"
+            file_path = f"{self.DATA_ROOT_PATH}/CN/{period}/{self.code}.pkl"
         else:  # 美股
-            file_path = f"/Users/zhoulj/work/qdata/data/US/{period}/{self.code}.pkl"
+            file_path = f"{self.DATA_ROOT_PATH}/US/{period}/{self.code}.pkl"
 
         if not os.path.exists(file_path):
             raise CChanException(f"file not exist: {file_path}", ErrCode.SRC_DATA_NOT_FOUND)
