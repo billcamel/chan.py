@@ -18,6 +18,7 @@ def create_item_dict(data, column_name):
 
 
 def parse_time_column(inp):
+    # time_format = '%Y-%m-%d' if self.k_type == KL_TYPE.K_DAY else '%Y-%m-%d %H:%M:%S'
     # 20210902113000000
     # 2021-09-13
     if len(inp) == 10:
@@ -31,7 +32,7 @@ def parse_time_column(inp):
         day = int(inp[6:8])
         hour = int(inp[8:10])
         minute = int(inp[10:12])
-    elif len(inp) == 19:
+    elif len(inp) == 19:  # 2021-09-13 12:00:00
         year = int(inp[:4])
         month = int(inp[5:7])
         day = int(inp[8:10])
@@ -44,7 +45,7 @@ def parse_time_column(inp):
 
 class PICKLE_API(CCommonStockApi):
     # 数据文件根目录
-    DATA_ROOT_PATH = "/Users/zhoulj/work/qdata/data"
+    DATA_ROOT_PATH = "/home/bill/work/stockquant/qdata/data"
     
     def __init__(self, code, k_type=KL_TYPE.K_DAY, begin_date=None, end_date=None, autype=None):
         self.columns = [
