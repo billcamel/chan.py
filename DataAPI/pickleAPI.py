@@ -81,10 +81,21 @@ class PICKLE_API(CCommonStockApi):
         if self.code.find("/") >= 0 or self.code.find("-") >= 0:  # 加密货币对
             codestr = self.code.replace("/","-") 
             file_path = f"{self.DATA_ROOT_PATH}/CRYPTO/{period}/{codestr}.pkl"
-        elif self.code[:1].isdigit():  # A股
-            file_path = f"{self.DATA_ROOT_PATH}/CN/{period}/{self.code}.pkl"
-        else:  # 美股
-            file_path = f"{self.DATA_ROOT_PATH}/US/{period}/{self.code}.pkl"
+        else:
+            parts = self.code.split('.')
+            if len(parts) != 2:
+                raise CChanException(f"stock code wrong!: {self.code}", ErrCode.SRC_DATA_NOT_FOUND)
+            code, market = parts
+            market = market.upper()
+            # A股市场（上海和深圳）
+            if market in ['SH', 'SZ']:
+                file_path = f"{self.DATA_ROOT_PATH}/CN/{period}/{self.code}.pkl"
+            # 港股市场
+            elif market in ['HK']:
+                file_path = f"{self.DATA_ROOT_PATH}/HK/{period}/{self.code}.pkl"
+            # 美股市场
+            elif market in ['US']:
+                file_path = f"{self.DATA_ROOT_PATH}/US/{period}/{self.code}.pkl"
 
         if not os.path.exists(file_path):
             raise CChanException(f"file not exist: {file_path}", ErrCode.SRC_DATA_NOT_FOUND)
