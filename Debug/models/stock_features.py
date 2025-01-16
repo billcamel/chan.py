@@ -76,7 +76,7 @@ class StockFeatureEngine:
             'high': [kl.high for kl in kline_data],
             'low': [kl.low for kl in kline_data],
             'close': [kl.close for kl in kline_data],
-            # 'volume': [kl.trade_info.metric['volume'] for kl in kline_data]
+            'volume': [kl.trade_info.metric['volume'] for kl in kline_data]
         })
         
         try:

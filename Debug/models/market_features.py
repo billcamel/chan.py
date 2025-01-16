@@ -4,6 +4,7 @@ import numpy as np
 import json
 from .stock_features import feature_engine
 from .feature_processor import FeatureProcessor
+import pandas as pd
 
 def safe_div(a, b, default=0):
     """安全除法"""
@@ -62,16 +63,23 @@ def get_market_features(kline_data: List[Any], idx: int) -> Dict[str, float]:
     norm_high = normalize_price(high_prices)
     norm_low = normalize_price(low_prices)
     
-    # 计算技术指标时使用归一化后的价格
+    # 基础价格特征
     features = {
         'norm_close': norm_close[-1],
-        'norm_high': norm_high[-1],
+        # 'norm_high': norm_high[-1],
         'norm_low': norm_low[-1],
-        'price_std_20': np.std(norm_close[-20:]),
-        'price_trend_20': (norm_close[-1] - norm_close[-20]) if len(norm_close) >= 20 else 0,
+        # 'price_std_20': np.std(norm_close[-20:]),
+        # 'price_trend_20': (norm_close[-1] - norm_close[-20]) if len(norm_close) >= 20 else 0,
         # 'vol_std_20': np.std([k.trade_info.metric['volume'] for k in kline_data[idx-19:idx+1]]) if idx >= 19 else 0,
         # 'vol_trend_20': (kline_data[idx].trade_info.metric['volume'] - kline_data[idx-19].trade_info.metric['volume']) if idx >= 19 else 0,
     }
+    
+    # 获取技术指标特征
+    if idx >= 33:  # 确保有足够的历史数据
+        ta_features = feature_engine.get_features(kline_data, idx)
+        # 只保留非NaN的特征
+        ta_features = {k: v for k, v in ta_features.items() if pd.notna(v)}
+        features.update(ta_features)
     
     # 添加移动平均相关特征
     for period in [5, 10, 20]:

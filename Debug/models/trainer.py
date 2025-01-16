@@ -16,13 +16,13 @@ class ModelTrainer:
     def __init__(self, params: Dict = None):
         """初始化训练器"""
         self.params = params or {
-            'max_depth': 3,
+            'max_depth': 5,
             'learning_rate': 0.1,  # 使用learning_rate替代eta
             'objective': 'binary:logistic',
             'eval_metric': 'auc',  # 简化评估指标
             'tree_method': 'hist',
             'min_child_weight': 1,
-            'subsample': 0.8,
+            'subsample': 0.9,
             'colsample_bytree': 0.8,
             'scale_pos_weight': 1,
             'n_jobs': 4,  # 使用n_jobs替代nthread
