@@ -77,6 +77,7 @@ class PICKLE_API(CCommonStockApi):
         if period is None:
             raise CChanException(f"Unsupported k_type: {self.k_type}", ErrCode.PARA_ERROR)
         
+        file_path = ""
         # 根据代码类型和周期生成文件路径
         if self.code.find("/") >= 0 or self.code.find("-") >= 0:  # 加密货币对
             codestr = self.code.replace("/","-") 
@@ -86,16 +87,24 @@ class PICKLE_API(CCommonStockApi):
             if len(parts) != 2:
                 raise CChanException(f"stock code wrong!: {self.code}", ErrCode.SRC_DATA_NOT_FOUND)
             code, market = parts
-            market = market.upper()
-            # A股市场（上海和深圳）
-            if market in ['SH', 'SZ']:
-                file_path = f"{self.DATA_ROOT_PATH}/CN/{period}/{self.code}.pkl"
-            # 港股市场
-            elif market in ['HK']:
-                file_path = f"{self.DATA_ROOT_PATH}/HK/{period}/{self.code}.pkl"
-            # 美股市场
-            elif market in ['US']:
-                file_path = f"{self.DATA_ROOT_PATH}/US/{period}/{self.code}.pkl"
+            # 根据code判断market_id
+            if market == 'SH':
+                symbol_with_id = f"{code}.SH.1"
+                file_path = f"{self.DATA_ROOT_PATH}/CN/{period}/{symbol_with_id}.pkl"
+            elif market == 'SZ':
+                symbol_with_id = f"{code}.SZ.0"
+                file_path = f"{self.DATA_ROOT_PATH}/CN/{period}/{symbol_with_id}.pkl"
+            elif market == 'HK':
+                symbol_with_id = f"{code}.HK.128"
+                file_path = f"{self.DATA_ROOT_PATH}/HK/{period}/{symbol_with_id}.pkl"
+            elif market == 'US':
+                # 遍历美股的三种可能market_id
+                for market_id in [105, 106, 107]:
+                    symbol_with_id = f"{code}.US.{market_id}"
+                    tmp_path = f"{self.DATA_ROOT_PATH}/US/{period}/{symbol_with_id}.pkl"
+                    if os.path.exists(tmp_path):
+                        file_path = tmp_path
+                        break
 
         if not os.path.exists(file_path):
             raise CChanException(f"file not exist: {file_path}", ErrCode.SRC_DATA_NOT_FOUND)
