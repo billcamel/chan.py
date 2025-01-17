@@ -80,21 +80,43 @@ class FeatureEngine:
         features = pd.DataFrame()
         
         try:
-            # 趋势指标
+            # === 趋势类指标 ===
+            # MA族
             for period in [10, 20, 60]:
                 features[f'sma{period}'] = talib.SMA(df.close, timeperiod=period)
                 features[f'ema{period}'] = talib.EMA(df.close, timeperiod=period)
+                features[f'wma{period}'] = talib.WMA(df.close, timeperiod=period)  # 加权移动平均
             
-            # MACD
+            # MACD族
             macd, signal, hist = talib.MACD(df.close)
             features['macd'] = macd
             features['macd_signal'] = signal
             features['macd_hist'] = hist
             
-            # RSI
-            for period in [12]:
+            # 抛物线转向 - SAR
+            features['sar'] = talib.SAR(df.high, df.low)
+            features['sar_ratio'] = (df.close - features['sar']) / df.close
+            
+            # === 动量类指标 ===
+            # RSI族
+            for period in [6, 12, 24]:
                 features[f'rsi_{period}'] = talib.RSI(df.close, timeperiod=period)
             
+            # 随机指标族
+            slowk, slowd = talib.STOCH(df.high, df.low, df.close)
+            fastk, fastd = talib.STOCHF(df.high, df.low, df.close)
+            features['slowk'] = slowk
+            features['slowd'] = slowd
+            features['fastk'] = fastk
+            features['fastd'] = fastd
+            
+            # 动量指标
+            for period in [10, 20]:
+                features[f'mom_{period}'] = talib.MOM(df.close, timeperiod=period)
+                features[f'roc_{period}'] = talib.ROC(df.close, timeperiod=period)
+                features[f'trix_{period}'] = talib.TRIX(df.close, timeperiod=period)
+            
+            # === 波动类指标 ===
             # 布林带
             upper, middle, lower = talib.BBANDS(df.close)
             features['boll'] = middle
@@ -103,32 +125,52 @@ class FeatureEngine:
             features['boll_width'] = (upper - lower) / middle
             features['boll_position'] = (df.close - lower) / (upper - lower)
             
-            # KDJ
-            slowk, slowd = talib.STOCH(df.high, df.low, df.close)
-            features['kdj_k'] = slowk
-            features['kdj_d'] = slowd
-            features['kdj_j'] = 3 * slowk - 2 * slowd
-            
-            # 成交量
-            features['volume_sma5'] = talib.SMA(df.volume, timeperiod=5)
-            features['volume_sma10'] = talib.SMA(df.volume, timeperiod=10)
-            features['obv'] = talib.OBV(df.close, df.volume)
-            features['ad'] = talib.AD(df.high, df.low, df.close, df.volume)
-            
-            # ATR
+            # ATR族
             features['atr'] = talib.ATR(df.high, df.low, df.close)
+            features['natr'] = talib.NATR(df.high, df.low, df.close)  # 归一化ATR
             features['atr_ratio'] = features['atr'] / df.close
             
-            # DMI
+            # === 成交量类指标 ===
+            # 成交量均线
+            for period in [5, 10, 20]:
+                features[f'volume_sma{period}'] = talib.SMA(df.volume, timeperiod=period)
+            
+            # 成交量动量指标
+            features['obv'] = talib.OBV(df.close, df.volume)  # 能量潮
+            features['ad'] = talib.AD(df.high, df.low, df.close, df.volume)  # 累积/派发线
+            features['adosc'] = talib.ADOSC(df.high, df.low, df.close, df.volume)  # A/D震荡指标
+            
+            # === 趋势确认指标 ===
+            # DMI族
             features['plus_di'] = talib.PLUS_DI(df.high, df.low, df.close)
             features['minus_di'] = talib.MINUS_DI(df.high, df.low, df.close)
             features['adx'] = talib.ADX(df.high, df.low, df.close)
+            features['adxr'] = talib.ADXR(df.high, df.low, df.close)
             
-            # 动量指标
-            features['cci'] = talib.CCI(df.high, df.low, df.close)
-            features['mfi'] = talib.MFI(df.high, df.low, df.close, df.volume)
-            features['roc'] = talib.ROC(df.close)
+            # === 其他综合指标 ===
+            # 威廉指标
             features['willr'] = talib.WILLR(df.high, df.low, df.close)
+            
+            # CCI
+            features['cci'] = talib.CCI(df.high, df.low, df.close)
+            
+            # 资金流向指标
+            features['mfi'] = talib.MFI(df.high, df.low, df.close, df.volume)
+            
+            # 相对强弱指数
+            features['dx'] = talib.DX(df.high, df.low, df.close)  # 动向指数
+            
+            # 价格动量指标
+            features['ppo'] = talib.PPO(df.close)  # 价格震荡百分比
+            features['ultosc'] = talib.ULTOSC(df.high, df.low, df.close)  # 终极波动指标
+            
+            # === 自定义组合指标 ===
+            # 均线交叉
+            features['ma_cross'] = (features['sma10'] - features['sma20']) / df.close
+            features['di_cross'] = features['plus_di'] - features['minus_di']
+            
+            # 趋势强度
+            features['trend_strength'] = features['adx'] * np.sign(features['di_cross'])
             
         except Exception as e:
             print(f"计算技术指标出错: {str(e)}")
