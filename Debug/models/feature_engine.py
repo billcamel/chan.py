@@ -87,8 +87,8 @@ class FeatureEngine:
             
             # MACD
             macd, signal, hist = talib.MACD(df.close)
-            # features['macd'] = macd
-            # features['macd_signal'] = signal
+            features['macd'] = macd
+            features['macd_signal'] = signal
             features['macd_hist'] = hist
             
             # RSI
@@ -99,30 +99,30 @@ class FeatureEngine:
             upper, middle, lower = talib.BBANDS(df.close)
             features['boll'] = middle
             features['boll_ub'] = upper
-            # features['boll_lb'] = lower
-            # features['boll_width'] = (upper - lower) / middle
-            # features['boll_position'] = (df.close - lower) / (upper - lower)
+            features['boll_lb'] = lower
+            features['boll_width'] = (upper - lower) / middle
+            features['boll_position'] = (df.close - lower) / (upper - lower)
             
             # KDJ
             slowk, slowd = talib.STOCH(df.high, df.low, df.close)
             features['kdj_k'] = slowk
-            # features['kdj_d'] = slowd
+            features['kdj_d'] = slowd
             features['kdj_j'] = 3 * slowk - 2 * slowd
             
             # 成交量
-            # features['volume_sma5'] = talib.SMA(df.volume, timeperiod=5)
-            # features['volume_sma10'] = talib.SMA(df.volume, timeperiod=10)
-            # features['obv'] = talib.OBV(df.close, df.volume)
+            features['volume_sma5'] = talib.SMA(df.volume, timeperiod=5)
+            features['volume_sma10'] = talib.SMA(df.volume, timeperiod=10)
+            features['obv'] = talib.OBV(df.close, df.volume)
             features['ad'] = talib.AD(df.high, df.low, df.close, df.volume)
             
             # ATR
             features['atr'] = talib.ATR(df.high, df.low, df.close)
-            # features['atr_ratio'] = features['atr'] / df.close
+            features['atr_ratio'] = features['atr'] / df.close
             
             # DMI
             features['plus_di'] = talib.PLUS_DI(df.high, df.low, df.close)
             features['minus_di'] = talib.MINUS_DI(df.high, df.low, df.close)
-            # features['adx'] = talib.ADX(df.high, df.low, df.close)
+            features['adx'] = talib.ADX(df.high, df.low, df.close)
             
             # 动量指标
             features['cci'] = talib.CCI(df.high, df.low, df.close)
