@@ -15,8 +15,8 @@ from ChanModel.Features import CFeatures
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 from Plot.PlotDriver import CPlotDriver
-from models import get_market_features, save_features
 from models.trainer import ModelTrainer
+from models.feature_engine import FeatureEngine, FeatureType
 
 
 class T_SAMPLE_INFO(TypedDict):
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     """
     code = "BTC/USDT"
     begin_time = "2020-01-01"
-    end_time = "2022-01-01"
+    end_time = "2023-01-01"
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
     lv_list = [KL_TYPE.K_60M]
@@ -80,7 +80,7 @@ if __name__ == "__main__":
         "min_zs_cnt": 0,
         "bs1_peak": False,
         "macd_algo": "peak",
-        "bs_type": '1,2,3a,1p,2s,3b',
+        "bs_type": '1,1p',
         "print_warning": True,
         "zs_algo": "normal",
     })
@@ -95,8 +95,12 @@ if __name__ == "__main__":
         autype=AUTYPE.QFQ,
     )
 
+    # 初始化特征引擎
+    feature_engine = FeatureEngine()
+
     bsp_dict: Dict[int, T_SAMPLE_INFO] = {}  # 存储策略产出的bsp的特征
     kline_data = []  # 存储K线数据用于后续分析
+    
     # 跑策略，保存买卖点的特征
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
@@ -114,15 +118,16 @@ if __name__ == "__main__":
                 "is_buy": last_bsp.is_buy,
                 "open_time": last_klu.time,
             }
-            bsp_dict[last_bsp.klu.idx]['feature'].add_feat(get_market_features(kline_data, len(kline_data)-1))  # 开仓K线特征
-            # print(last_bsp.klu.time, last_bsp.is_buy)
+            # 使用特征引擎计算特征
+            market_features = feature_engine.get_features(kline_data, len(kline_data)-1)
+            bsp_dict[last_bsp.klu.idx]['feature'].add_feat(market_features)
 
     # 生成特征数据
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
-    plot_marker, feature_meta, X, y = save_features(bsp_dict, bsp_academy)
+    plot_marker, feature_meta, X, y = feature_engine.save_features(bsp_dict, bsp_academy)
     
     # 画图检查label是否正确
-    plot(chan, plot_marker)
+    # plot(chan, plot_marker)
     
     # 训练模型
     trainer = ModelTrainer()

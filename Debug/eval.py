@@ -15,8 +15,9 @@ from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 
 # 导入特征计算相关函数
-from models import get_market_features, FeatureProcessor
+from models import FeatureProcessor
 from models.trainer import ModelEvaluator
+from models.feature_engine import FeatureEngine, FeatureType
 
 
 def predict_bsp(model: xgb.Booster, features: Dict[str, float], feature_meta: Dict[str, int], processor: FeatureProcessor) -> float:
@@ -51,14 +52,25 @@ if __name__ == "__main__":
     本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
     code = "BTC/USDT"
-    begin_time = "2022-01-01"
+    begin_time = "2023-01-01"
     end_time = None
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
     lv_list = [KL_TYPE.K_60M]
 
     config = CChanConfig({
-        "trigger_step": True,
+        "trigger_step": True,  # 打开开关！
+        "bi_strict": True,
+        "skip_step": 0,
+        "divergence_rate": float("inf"),
+        "bsp2_follow_1": False,
+        "bsp3_follow_1": False,
+        "min_zs_cnt": 0,
+        "bs1_peak": False,
+        "macd_algo": "peak",
+        "bs_type": '1,1p',
+        "print_warning": True,
+        "zs_algo": "normal",
     })
 
     chan = CChan(
@@ -70,6 +82,9 @@ if __name__ == "__main__":
         config=config,
         autype=AUTYPE.QFQ,
     )
+
+    # 初始化特征引擎
+    feature_engine = FeatureEngine()
 
     # 加载模型和特征映射
     model = xgb.Booster()
@@ -96,8 +111,8 @@ if __name__ == "__main__":
         if last_bsp.klu.idx in treated_bsp_idx or cur_lv_chan[-2].idx != last_bsp.klu.klc.idx:
             continue
 
-        # 计算特征
-        features = get_market_features(kline_data, len(kline_data)-1)
+        # 使用特征引擎计算特征
+        features = feature_engine.get_features(kline_data, len(kline_data)-1)
         
         # 预测买卖点的概率
         prob = predict_bsp(model, features, feature_meta, processor)
