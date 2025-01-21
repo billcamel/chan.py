@@ -54,3 +54,47 @@ class ModelManager:
         if train_info:
             with open(os.path.join(model_dir, "train_info.json"), "w") as f:
                 json.dump(train_info, f, indent=2) 
+
+    def is_model_dir(self, directory: str) -> bool:
+        """检查目录是否是有效的模型目录
+        
+        Args:
+            directory: 目录路径
+            
+        Returns:
+            bool: 是否是有效的模型目录
+        """
+        required_files = [
+            "model.json",
+            "feature.meta",
+            "feature_processor.joblib",
+            "train_info.json"
+        ]
+        
+        return all(
+            os.path.exists(os.path.join(directory, f))
+            for f in required_files
+        )
+        
+    def get_latest_model(self) -> str:
+        """获取最新的模型目录
+        
+        Returns:
+            str: 最新模型的目录路径，如果没有则返回None
+        """
+        if not os.path.exists(self.base_dir):
+            return None
+            
+        # 获取所有有效的模型目录
+        model_dirs = [
+            d for d in os.listdir(self.base_dir)
+            if os.path.isdir(os.path.join(self.base_dir, d)) and 
+            self.is_model_dir(os.path.join(self.base_dir, d))
+        ]
+        
+        if not model_dirs:
+            return None
+            
+        # 按目录名（时间戳）排序，返回最新的
+        latest_dir = sorted(model_dirs)[-1]
+        return os.path.join(self.base_dir, latest_dir) 

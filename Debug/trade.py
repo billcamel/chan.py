@@ -16,6 +16,7 @@ from DataAPI.pickleAPI import PICKLE_API
 from models.trade_analyzer import TradeAnalyzer
 from models import FeatureProcessor
 from models.feature_engine import FeatureEngine
+from models.model_manager import ModelManager
 
 
 def predict_bsp(model: xgb.Booster, features: Dict[str, float], feature_meta: Dict[str, int], processor: FeatureProcessor) -> float:
@@ -68,12 +69,32 @@ if __name__ == "__main__":
     PICKLE_API.do_init()
     data_src = PICKLE_API(code, k_type=kl_type, begin_date=begin_time, end_date=end_time, autype=AUTYPE.QFQ)  # 初始化数据源类
 
-    # 加载模型和特征映射
+    # 初始化模型管理器
+    model_manager = ModelManager()
+    
+    # 获取最新模型目录
+    model_dir = model_manager.get_latest_model()
+    if model_dir is None:
+        raise ValueError("未找到可用的模型")
+    
+    # 加载模型文件
     model = xgb.Booster()
-    model.load_model("model.json")
-    with open("feature.meta", "r") as f:
+    model.load_model(os.path.join(model_dir, "model.json"))
+    
+    # 加载特征映射和处理器
+    with open(os.path.join(model_dir, "feature.meta"), "r") as f:
         feature_meta = json.load(f)
-    processor = FeatureProcessor.load("feature_processor.joblib")
+    processor = FeatureProcessor.load(os.path.join(model_dir, "feature_processor.joblib"))
+    
+    # 加载训练信息
+    with open(os.path.join(model_dir, "train_info.json"), "r") as f:
+        train_info = json.load(f)
+        
+    print(f"\n加载模型: {model_dir}")
+    print("训练信息:")
+    print(f"品种: {train_info['code']}")
+    print(f"周期: {train_info['kl_type']}")
+    print(f"训练数据: {train_info['begin_time']} - {train_info['end_time']}")
     
     # 初始化特征引擎
     feature_engine = FeatureEngine()
