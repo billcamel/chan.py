@@ -134,7 +134,7 @@ class TradeAnalyzer:
         
         # 计算资金曲线
         capital = self.initial_capital
-        equity_curve = [capital]
+        equity_data = []  # 存储时间和资金数据
         trade_points = []
         last_buy_price = None
         
@@ -155,7 +155,10 @@ class TradeAnalyzer:
                 if last_buy_price is not None:  # 确保有买入价格
                     profit = (trade['price'] - last_buy_price) / last_buy_price
                     capital *= (1 + profit)
-                    equity_curve.append(capital)
+                    equity_data.append({
+                        'time': trade['time'],
+                        'capital': capital
+                    })
                     trade_points.append({
                         'time': trade['time'],
                         'capital': capital,
@@ -163,12 +166,17 @@ class TradeAnalyzer:
                     })
                     last_buy_price = None  # 重置买入价格
         
+        if not equity_data:  # 如果没有交易数据，直接返回
+            print("没有足够的交易数据来绘制资金曲线")
+            return
+            
         # 绘制资金曲线
         plt.figure(figsize=(12, 6))
         
         # 绘制连续的资金曲线
-        times = [t['time'] for t in self.trade_history if not t['is_buy'] and t['prob'] > 0.6]
-        plt.plot(times, equity_curve, 'b-', label='资金曲线')
+        times = [d['time'] for d in equity_data]
+        capitals = [d['capital'] for d in equity_data]
+        plt.plot(times, capitals, 'b-', label='资金曲线')
         
         # 标记买卖点
         for point in trade_points:
