@@ -17,6 +17,7 @@ from Common.CTime import CTime
 from Plot.PlotDriver import CPlotDriver
 from models.trainer import ModelTrainer
 from models.feature_engine import FeatureEngine, FeatureType
+from models.model_manager import ModelManager
 
 
 class T_SAMPLE_INFO(TypedDict):
@@ -65,7 +66,7 @@ if __name__ == "__main__":
     """
     code = "BTC/USDT"
     begin_time = "2020-01-01"
-    end_time = "2023-01-01"
+    end_time = "2021-01-01"
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
     lv_list = [KL_TYPE.K_60M]
@@ -166,11 +167,48 @@ if __name__ == "__main__":
     # 绘制特征重要性图
     trainer.plot_feature_importance()
     
-    # 保存模型
+    # 初始化模型管理器
+    model_manager = ModelManager()
+    
+    # 创建新的模型目录
+    model_dir = model_manager.create_model_dir()
+    
+    # 先保存到当前目录
     if hasattr(trainer.model, '_Booster'):
-        trainer.model._Booster.save_model("model.json")  # 保存内部的Booster模型
+        trainer.model._Booster.save_model("model.json")
     else:
         trainer.model.save_model("model.json")
+        
+    # 复制文件到模型目录
+    model_manager.save_model(
+        model_dir=model_dir,
+        model_path="model.json",
+        meta_path="feature.meta",
+        processor_path="feature_processor.joblib",
+        chan_config={
+            "trigger_step": True,
+            "bi_strict": True,
+            "skip_step": 0,
+            "divergence_rate": float("inf"),
+            "bsp2_follow_1": False,
+            "bsp3_follow_1": False,
+            "min_zs_cnt": 0,
+            "bs1_peak": False,
+            "macd_algo": "peak",
+            "bs_type": '1,1p',
+            "print_warning": True,
+            "zs_algo": "normal",
+        },
+        train_info={
+            "code": code,
+            "kl_type": str(lv_list[0]),
+            "begin_time": begin_time,
+            "end_time": end_time,
+            "data_src": str(data_src)
+        }
+    )
+    
+    print(f"\n模型已保存到: {model_dir}")
     
     # 分析特征
     trainer.analyze_features(X, y, list(feature_meta.keys()))
