@@ -14,10 +14,14 @@ from ChanConfig import CChanConfig
 from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 
-# 导入特征计算相关函数
+# 修改导入路径
+from models.trade_analyzer import TradeAnalyzer
 from models import FeatureProcessor
 from models.trainer import ModelEvaluator
-from models.feature_engine import FeatureEngine, FeatureType
+from models.feature_engine import FeatureEngine
+from models.model_manager import ModelManager
+
+from Debug.models.trade_analyzer import TradeAnalyzer
 
 
 def predict_bsp(model: xgb.Booster, features: Dict[str, float], feature_meta: Dict[str, int], processor: FeatureProcessor) -> float:
@@ -83,15 +87,35 @@ if __name__ == "__main__":
         autype=AUTYPE.QFQ,
     )
 
+    # 初始化模型管理器
+    model_manager = ModelManager()
+    
+    # 获取最新模型目录
+    model_dir = model_manager.get_latest_model()
+    if model_dir is None:
+        raise ValueError("未找到可用的模型")
+    
+    # 加载模型文件
+    model = xgb.Booster()
+    model.load_model(os.path.join(model_dir, "model.json"))
+    
+    # 加载特征映射和处理器
+    with open(os.path.join(model_dir, "feature.meta"), "r") as f:
+        feature_meta = json.load(f)
+    processor = FeatureProcessor.load(os.path.join(model_dir, "feature_processor.joblib"))
+    
+    # 加载训练信息
+    with open(os.path.join(model_dir, "train_info.json"), "r") as f:
+        train_info = json.load(f)
+        
+    print(f"\n加载模型: {model_dir}")
+    print("训练信息:")
+    print(f"品种: {train_info['code']}")
+    print(f"周期: {train_info['kl_type']}")
+    print(f"训练数据: {train_info['begin_time']} - {train_info['end_time']}")
+    
     # 初始化特征引擎
     feature_engine = FeatureEngine()
-
-    # 加载模型和特征映射
-    model = xgb.Booster()
-    model.load_model("model.json")
-    with open("feature.meta", "r") as f:
-        feature_meta = json.load(f)
-    processor = FeatureProcessor.load("feature_processor.joblib")
 
     treated_bsp_idx = set()
     kline_data = []  # 存储K线数据用于后续分析
@@ -171,5 +195,22 @@ if __name__ == "__main__":
         is_correct = trade['idx'] in bsp_academy
         correct_mark = "√" if is_correct else "×"
         print(f"{trade['time']}\t{trade_type}\t{trade['prob']:.2%}\t{correct_mark}\t{trade['idx']}")
+
+    # 分析交易曲线
+    analyzer = TradeAnalyzer(initial_capital=100000)
+    stats = analyzer.analyze_trades(trades, threshold=evaluator.threshold)
+    analyzer.plot_equity_curve()
+    
+    # 打印交易统计
+    print("\n交易统计:")
+    print(f"初始资金: {stats['initial_capital']:,.0f}")
+    print(f"最终资金: {stats['final_capital']:,.0f}")
+    print(f"总收益率: {stats['total_return']:.2f}%")
+    print(f"胜率: {stats['win_rate']:.2f}%")
+    print(f"最大回撤: {stats['max_drawdown']:.2f}%")
+    print(f"盈亏比: {stats['profit_ratio']:.2f}")
+    print(f"总交易次数: {stats['trade_count']}")
+    print(f"买入次数: {stats['buy_count']}")
+    print(f"卖出次数: {stats['sell_count']}")
 
 

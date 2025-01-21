@@ -130,69 +130,63 @@ class TradeAnalyzer:
     
     def plot_equity_curve(self):
         """绘制资金曲线"""
-        plt.figure(figsize=(12, 6))
-        plt.plot(self.trade_times, self.equity_curve, 'b-', label='Equity Curve')
+        import matplotlib.pyplot as plt
         
-        # 尝试不同的时间格式
-        time_formats = [
-            '%Y-%m-%d %H:%M:%S',
-            '%Y/%m/%d %H:%M',
-            '%Y-%m-%d %H:%M',
-            '%Y/%m/%d',  # 添加日期格式
-            '%Y-%m-%d'
-        ]
+        # 计算资金曲线
+        capital = self.initial_capital
+        equity_curve = [capital]
+        trade_points = []
+        last_buy_price = None
         
-        # 添加买卖点标记
         for trade in self.trade_history:
-            time_str = str(trade['time'])
-            for time_format in time_formats:
-                try:
-                    if len(time_str) <= 10:
-                        time_str += " 00:00"
-                    time = datetime.strptime(time_str, time_format)
-                    break
-                except ValueError:
-                    continue
-            else:
-                try:
-                    if hasattr(trade['time'], 'to_str'):
-                        time_str = trade['time'].to_str()
-                        time = datetime.strptime(time_str, '%Y/%m/%d %H:%M')
-                    else:
-                        raise ValueError(f"无法解析时间格式: {time_str}")
-                except:
-                    raise ValueError(f"无法解析时间格式: {time_str}")
-                    
+            if trade['prob'] <= 0.6:
+                continue
+                
             if trade['is_buy']:
-                plt.plot(time, trade['capital'], 'g^', markersize=8, 
-                        label='Buy' if 'Buy' not in plt.gca().get_legend_handles_labels()[1] else "")
+                # 买入时记录点位和价格
+                last_buy_price = trade['price']
+                trade_points.append({
+                    'time': trade['time'],
+                    'capital': capital,
+                    'type': 'buy'
+                })
             else:
-                plt.plot(time, trade['capital'], 'rv', markersize=8, 
-                        label='Sell' if 'Sell' not in plt.gca().get_legend_handles_labels()[1] else "")
+                # 卖出时更新资金
+                if last_buy_price is not None:  # 确保有买入价格
+                    profit = (trade['price'] - last_buy_price) / last_buy_price
+                    capital *= (1 + profit)
+                    equity_curve.append(capital)
+                    trade_points.append({
+                        'time': trade['time'],
+                        'capital': capital,
+                        'type': 'sell'
+                    })
+                    last_buy_price = None  # 重置买入价格
         
-        plt.grid(True)
-        plt.title('资金曲线 (初始资金: {:,.0f})'.format(self.initial_capital))
+        # 绘制资金曲线
+        plt.figure(figsize=(12, 6))
+        
+        # 绘制连续的资金曲线
+        times = [t['time'] for t in self.trade_history if not t['is_buy'] and t['prob'] > 0.6]
+        plt.plot(times, equity_curve, 'b-', label='资金曲线')
+        
+        # 标记买卖点
+        for point in trade_points:
+            if point['type'] == 'buy':
+                plt.plot(point['time'], point['capital'], 'g^', markersize=8, 
+                        label='买入点' if '买入点' not in plt.gca().get_legend_handles_labels()[1] else "")
+            else:
+                plt.plot(point['time'], point['capital'], 'rv', markersize=8,
+                        label='卖出点' if '卖出点' not in plt.gca().get_legend_handles_labels()[1] else "")
+        
+        plt.title('交易资金曲线')
         plt.xlabel('时间')
         plt.ylabel('资金')
-        plt.legend(['资金曲线', '买入', '卖出'])
-        
-        # 添加统计信息
-        stats = self.analyze_trades(self.trade_history)
-        info_text = (
-            f"初始资金: {stats['initial_capital']:,.0f}\n"
-            f"收益率: {stats['total_return']:.2f}%\n"
-            f"胜率: {stats['win_rate']:.2f}%\n"
-            f"最大回撤: {stats['max_drawdown']:.2f}%\n"
-            f"盈亏比: {stats['profit_ratio']:.2f}"
-        )
-        plt.text(0.02, 0.98, info_text,
-                transform=plt.gca().transAxes,
-                verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-        
+        plt.grid(True)
+        plt.legend()
+        plt.xticks(rotation=45)
         plt.tight_layout()
-        plt.savefig('equity_curve.png', dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.show()
         
     def _calculate_win_rate(self) -> float:
         """计算胜率"""
