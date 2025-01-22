@@ -136,7 +136,11 @@ if __name__ == "__main__":
             continue
 
         # 使用特征引擎计算特征
-        features = feature_engine.get_features(kline_data, len(kline_data)-1)
+        features = feature_engine.get_features(
+            kline_data, 
+            len(kline_data)-1,
+            bsp_list  # 添加bsp_list参数
+        )
         
         # 预测买卖点的概率
         prob = predict_bsp(model, features, feature_meta, processor)

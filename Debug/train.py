@@ -12,7 +12,7 @@ sys.path.append(cpath+"/chan.py")
 from Chan import CChan
 from ChanConfig import CChanConfig
 from ChanModel.Features import CFeatures
-from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
+from Common.CEnum import AUTYPE, BSP_TYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
 from Plot.PlotDriver import CPlotDriver
 from models.trainer import ModelTrainer
@@ -110,6 +110,8 @@ if __name__ == "__main__":
         if not bsp_list:
             continue
         last_bsp = bsp_list[-1]
+        if BSP_TYPE.T1 not in last_bsp.type and BSP_TYPE.T1P not in last_bsp.type:
+            continue
 
         cur_lv_chan = chan_snapshot[0]
         if last_bsp.klu.idx not in bsp_dict and cur_lv_chan[-2].idx == last_bsp.klu.klc.idx:
@@ -120,7 +122,11 @@ if __name__ == "__main__":
                 "open_time": last_klu.time,
             }
             # 使用特征引擎计算特征
-            market_features = feature_engine.get_features(kline_data, len(kline_data)-1)
+            market_features = feature_engine.get_features(
+                kline_data, 
+                len(kline_data)-1,
+                bsp_list
+            )
             bsp_dict[last_bsp.klu.idx]['feature'].add_feat(market_features)
 
     # 生成特征数据

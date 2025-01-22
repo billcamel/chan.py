@@ -123,7 +123,11 @@ if __name__ == "__main__":
             continue
             
         # 计算特征并预测概率
-        features = feature_engine.get_features(kline_data, len(kline_data)-1)
+        features = feature_engine.get_features(
+            kline_data, 
+            len(kline_data)-1,
+            bsp_list  # 添加bsp_list参数
+        )
         prob = predict_bsp(model, features, feature_meta, processor)
         
         # 顶底分型时进行交易

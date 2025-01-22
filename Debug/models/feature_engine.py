@@ -1,10 +1,13 @@
 """统一的特征工程引擎"""
+import math
 from typing import Dict, List, Any, Tuple
 import numpy as np
 import pandas as pd
 import talib
 from enum import Enum, auto
 import json
+
+from Common.CEnum import BSP_TYPE
 from .feature_processor import FeatureProcessor
 
 class FeatureType(Enum):
@@ -22,7 +25,7 @@ class FeatureEngine:
         Args:
             enabled_types: 启用的特征类型列表
         """
-        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET]
+        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET, FeatureType.PATTERN]
         # 固定参数
         self.normalize_window = 100  # 归一化窗口
         
@@ -44,6 +47,10 @@ class FeatureEngine:
             'volume': [kl.trade_info.metric.get('volume', 0) for kl in kline_data]
         })
         
+        # 检查数据长度
+        if len(df) < self.normalize_window:
+            return pd.DataFrame()
+            
         features_df = pd.DataFrame()
         
         # 根据配置计算不同类型的特征
@@ -58,12 +65,13 @@ class FeatureEngine:
             
         return features_df
     
-    def get_features(self, kline_data: List[Any], idx: int) -> Dict[str, float]:
+    def get_features(self, kline_data: List[Any], idx: int, bsp_list: List = None) -> Dict[str, float]:
         """获取某个时间点的所有特征
         
         Args:
             kline_data: K线数据列表
             idx: 当前K线索引
+            bsp_list: 缠论买卖点列表
             
         Returns:
             特征字典
@@ -71,9 +79,20 @@ class FeatureEngine:
         if idx < self.normalize_window:
             return {}
             
+        # 使用transform获取基础特征
         df = self.transform(kline_data)
+        if df.empty:
+            return {}
+            
+        # 获取基础特征
         features = df.iloc[idx].to_dict()
-        return {k: v for k, v in features.items() if pd.notna(v)}
+        features = {k: v for k, v in features.items() if pd.notna(v)}
+        
+        # 添加缠论特征
+        if FeatureType.PATTERN in self.enabled_types and bsp_list:
+            features.update(self._get_chan_features(bsp_list))
+            
+        return features
     
     def _get_technical_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """计算技术指标特征"""
@@ -311,6 +330,46 @@ class FeatureEngine:
             json.dump(feature_meta, fid, indent=2)
             
         return plot_marker, feature_meta, X, y
+
+    def _get_chan_features(self, bsp_list: List) -> Dict[str, float]:
+        """计算缠论特征
+        
+        Args:
+            bsp_list: 缠论买卖点列表
+            
+        Returns:
+            缠论特征字典
+        """
+        features = {}
+        
+        if not bsp_list or len(bsp_list) < 4:
+            features['bsp_d1'] = 0
+            features['bsp_d2'] = 0 
+            features['bsp_d3'] = 0
+            return features
+            
+        # 获取最后一个买卖点
+        last_bsp = bsp_list[-1]
+        
+        # 计算最近4个买卖点之间的距离特征
+        last_bsp2 = bsp_list[-2]
+        last_bsp3 = bsp_list[-3] 
+        last_bsp4 = bsp_list[-4]
+        
+        # 计算相邻买卖点之间的欧氏距离
+        dk1 = last_bsp.klu.idx - last_bsp2.klu.idx # k线距离
+        dp1 = abs(last_bsp.klu.close - last_bsp2.klu.close) # 价格差
+        features['bsp_d1'] = math.sqrt(dp1*dp1 + dk1*dk1)
+        
+        dk2 = last_bsp2.klu.idx - last_bsp3.klu.idx # k线距离
+        dp2 = abs(last_bsp2.klu.close - last_bsp3.klu.close) # 价格差
+        features['bsp_d2'] = math.sqrt(dp2*dp2 + dk2*dk2)
+        
+        dk3 = last_bsp3.klu.idx - last_bsp4.klu.idx # k线距离
+        dp3 = abs(last_bsp3.klu.close - last_bsp4.klu.close) # 价格差
+        features['bsp_d3'] = math.sqrt(dp3*dp3 + dk3*dk3)
+            
+        return features
 
 # 创建全局特征引擎实例
 feature_engine = FeatureEngine() 
