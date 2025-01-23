@@ -129,7 +129,13 @@ if __name__ == "__main__":
                 len(kline_data)-1,
                 chan_snapshot  # 传入缠论快照
             )
+            # if len(kline_data) > 100:
+            #     print(market_features)
+            #     break
+
             bsp_dict[last_bsp.klu.idx]['feature'].add_feat(market_features)
+
+    print(market_features)
 
     # 生成特征数据
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]

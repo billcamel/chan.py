@@ -15,6 +15,7 @@ class FeatureType(Enum):
     TECHNICAL = auto()  # 技术指标
     MARKET = auto()     # 市场特征
     PATTERN = auto()    # 形态特征
+    CHAN = auto()    # 缠论特征
     CUSTOM = auto()     # 自定义特征
 
 class FeatureEngine:
@@ -25,7 +26,7 @@ class FeatureEngine:
         Args:
             enabled_types: 启用的特征类型列表
         """
-        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET, FeatureType.PATTERN]
+        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET, FeatureType.PATTERN, FeatureType.CHAN]
         # 固定参数
         self.normalize_window = 100  # 归一化窗口
         
@@ -51,19 +52,23 @@ class FeatureEngine:
         if len(df) < self.normalize_window:
             return pd.DataFrame()
             
-        features_df = pd.DataFrame()
+        # 计算所有特征
+        features = {}
         
         # 根据配置计算不同类型的特征
         if FeatureType.TECHNICAL in self.enabled_types:
-            features_df = pd.concat([features_df, self._get_technical_features(df)], axis=1)
+            features.update(self._get_technical_features(df))
             
         if FeatureType.MARKET in self.enabled_types:
-            features_df = pd.concat([features_df, self._get_market_features(df)], axis=1)
+            market_features = self._get_market_features(df)
+            features.update(market_features)
             
         if FeatureType.PATTERN in self.enabled_types:
-            features_df = pd.concat([features_df, self._get_pattern_features(df)], axis=1)
-            
-        return features_df
+            pattern_features = self._get_pattern_features(df)
+            features.update(pattern_features)
+        
+        # 转换为单行DataFrame
+        return pd.DataFrame([features])
     
     def get_features(self, kline_data: List[Any], idx: int, chan_snapshot: Any = None) -> Dict[str, float]:
         """获取某个时间点的所有特征
@@ -84,121 +89,170 @@ class FeatureEngine:
         if df.empty:
             return {}
             
-        # 获取基础特征
-        features = df.iloc[idx].to_dict()
+        # 获取基础特征（transform返回的是单行DataFrame）
+        features = df.iloc[0].to_dict()
         features = {k: v for k, v in features.items() if pd.notna(v)}
         
         # 添加缠论特征
-        if FeatureType.PATTERN in self.enabled_types and chan_snapshot:
+        if FeatureType.CHAN in self.enabled_types and chan_snapshot:
             features.update(self._get_chan_features(chan_snapshot))
             
         return features
     
-    def _get_technical_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """计算技术指标特征"""
-        features = pd.DataFrame()
+    def _get_technical_features(self, df: pd.DataFrame) -> Dict[str, float]:
+        """计算最后一根K线的技术指标特征"""
+        features = {}
         
         try:
             # === 趋势类指标 ===
             # MA族
-            for period in [60, 120]:
-                features[f'sma{period}'] = talib.SMA(df.close, timeperiod=period)
-                features[f'ema{period}'] = talib.EMA(df.close, timeperiod=period)
-                features[f'wma{period}'] = talib.WMA(df.close, timeperiod=period)  # 加权移动平均
+            ma_periods = [5, 10, 20, 60, 120]
+            ma_values = {}  # 存储不同周期的均线值
+            
+            for period in ma_periods:
+                sma = talib.SMA(df.close, timeperiod=period)
+                ema = talib.EMA(df.close, timeperiod=period)
+                wma = talib.WMA(df.close, timeperiod=period)
+                
+                ma_values[f'sma{period}'] = sma.iloc[-1]
+                ma_values[f'ema{period}'] = ema.iloc[-1]
+                
+                # 基础均线值
+                features[f'sma{period}'] = sma.iloc[-1]
+                features[f'ema{period}'] = ema.iloc[-1]
+                features[f'wma{period}'] = wma.iloc[-1]
+                
+                # 价格相对均线位置
+                features[f'price_sma{period}_ratio'] = (df.close.iloc[-1] - sma.iloc[-1]) / sma.iloc[-1]
+                features[f'price_ema{period}_ratio'] = (df.close.iloc[-1] - ema.iloc[-1]) / ema.iloc[-1]
+                
+                # 均线斜率
+                features[f'sma{period}_slope'] = (sma.iloc[-1] - sma.iloc[-2]) / sma.iloc[-2]
+                features[f'ema{period}_slope'] = (ema.iloc[-1] - ema.iloc[-2]) / ema.iloc[-2]
+            
+            # 均线多空头排列
+            for i in range(len(ma_periods)-1):
+                period1 = ma_periods[i]
+                period2 = ma_periods[i+1]
+                # 短期均线相对长期均线位置
+                features[f'sma{period1}_{period2}_ratio'] = (ma_values[f'sma{period1}'] - ma_values[f'sma{period2}']) / ma_values[f'sma{period2}']
+                features[f'ema{period1}_{period2}_ratio'] = (ma_values[f'ema{period1}'] - ma_values[f'ema{period2}']) / ma_values[f'ema{period2}']
+            
+            # 均线多头/空头排列强度
+            features['ma_bull_power'] = sum(1 for i in range(len(ma_periods)-1) 
+                                          if ma_values[f'sma{ma_periods[i]}'] > ma_values[f'sma{ma_periods[i+1]}'])
+            features['ma_bear_power'] = sum(1 for i in range(len(ma_periods)-1) 
+                                          if ma_values[f'sma{ma_periods[i]}'] < ma_values[f'sma{ma_periods[i+1]}'])
             
             # MACD族
             macd, signal, hist = talib.MACD(df.close)
-            features['macd'] = macd
-            features['macd_signal'] = signal
-            features['macd_hist'] = hist
+            features['macd'] = macd.iloc[-1]
+            features['macd_signal'] = signal.iloc[-1]
+            features['macd_hist'] = hist.iloc[-1]
+            
+            # MACD相关指标
+            features['macd_ratio'] = macd.iloc[-1] / df.close.iloc[-1]  # MACD相对价格
+            features['macd_hist_ratio'] = hist.iloc[-1] / df.close.iloc[-1]  # MACD柱状图相对价格
+            features['macd_cross'] = (macd.iloc[-1] - signal.iloc[-1]) / df.close.iloc[-1]  # MACD交叉状态
+            features['macd_hist_slope'] = (hist.iloc[-1] - hist.iloc[-2]) / abs(hist.iloc[-2]) if hist.iloc[-2] != 0 else 0  # 柱状图斜率
             
             # 抛物线转向 - SAR
-            features['sar'] = talib.SAR(df.high, df.low)
-            features['sar_ratio'] = (df.close - features['sar']) / df.close
+            sar = talib.SAR(df.high, df.low)
+            features['sar'] = sar.iloc[-1]
+            features['sar_ratio'] = (df.close.iloc[-1] - sar.iloc[-1]) / df.close.iloc[-1]
+            features['sar_slope'] = (sar.iloc[-1] - sar.iloc[-2]) / sar.iloc[-2]
             
             # === 动量类指标 ===
             # RSI族
-            for period in [ 12, 24, 60]:
-                features[f'rsi_{period}'] = talib.RSI(df.close, timeperiod=period)
+            for period in [6, 12, 24, 60]:
+                rsi = talib.RSI(df.close, timeperiod=period)
+                features[f'rsi_{period}'] = rsi.iloc[-1]
+                # RSI变化率
+                features[f'rsi_{period}_slope'] = (rsi.iloc[-1] - rsi.iloc[-2]) / rsi.iloc[-2]
+                # RSI超买超卖
+                features[f'rsi_{period}_overbought'] = 1 if rsi.iloc[-1] > 70 else 0
+                features[f'rsi_{period}_oversold'] = 1 if rsi.iloc[-1] < 30 else 0
             
             # 随机指标族
             slowk, slowd = talib.STOCH(df.high, df.low, df.close)
             fastk, fastd = talib.STOCHF(df.high, df.low, df.close)
-            features['slowk'] = slowk
-            features['slowd'] = slowd
-            features['fastk'] = fastk
-            features['fastd'] = fastd
+            features['slowk'] = slowk.iloc[-1]
+            features['slowd'] = slowd.iloc[-1]
+            features['fastk'] = fastk.iloc[-1]
+            features['fastd'] = fastd.iloc[-1]
+            
+            # KD指标交叉和超买超卖
+            features['kd_cross'] = (slowk.iloc[-1] - slowd.iloc[-1])
+            features['kd_overbought'] = 1 if slowk.iloc[-1] > 80 and slowd.iloc[-1] > 80 else 0
+            features['kd_oversold'] = 1 if slowk.iloc[-1] < 20 and slowd.iloc[-1] < 20 else 0
             
             # 动量指标
             for period in [10, 20]:
-                features[f'mom_{period}'] = talib.MOM(df.close, timeperiod=period)
-                features[f'roc_{period}'] = talib.ROC(df.close, timeperiod=period)
-                features[f'trix_{period}'] = talib.TRIX(df.close, timeperiod=period)
+                mom = talib.MOM(df.close, timeperiod=period)
+                roc = talib.ROC(df.close, timeperiod=period)
+                trix = talib.TRIX(df.close, timeperiod=period)
+                
+                features[f'mom_{period}'] = mom.iloc[-1]
+                features[f'roc_{period}'] = roc.iloc[-1]
+                features[f'trix_{period}'] = trix.iloc[-1]
             
             # === 波动类指标 ===
             # 布林带
             upper, middle, lower = talib.BBANDS(df.close)
-            features['boll'] = middle
-            features['boll_ub'] = upper
-            features['boll_lb'] = lower
-            features['boll_width'] = (upper - lower) / middle
-            features['boll_position'] = (df.close - lower) / (upper - lower)
+            features['boll'] = middle.iloc[-1]
+            features['boll_ub'] = upper.iloc[-1]
+            features['boll_lb'] = lower.iloc[-1]
+            features['boll_width'] = (upper.iloc[-1] - lower.iloc[-1]) / middle.iloc[-1]
+            features['boll_position'] = (df.close.iloc[-1] - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
             
             # ATR族
-            features['atr'] = talib.ATR(df.high, df.low, df.close)
-            features['natr'] = talib.NATR(df.high, df.low, df.close)  # 归一化ATR
-            features['atr_ratio'] = features['atr'] / df.close
+            atr = talib.ATR(df.high, df.low, df.close)
+            natr = talib.NATR(df.high, df.low, df.close)
+            features['atr'] = atr.iloc[-1]
+            features['natr'] = natr.iloc[-1]
+            features['atr_ratio'] = atr.iloc[-1] / df.close.iloc[-1]
             
             # === 成交量类指标 ===
             # 成交量均线
             for period in [5, 10, 20]:
-                features[f'volume_sma{period}'] = talib.SMA(df.volume, timeperiod=period)
+                vol_sma = talib.SMA(df.volume, timeperiod=period)
+                features[f'volume_sma{period}'] = vol_sma.iloc[-1]
+                features[f'volume_sma{period}_ratio'] = df.volume.iloc[-1] / vol_sma.iloc[-1]
             
             # 成交量动量指标
-            features['obv'] = talib.OBV(df.close, df.volume)  # 能量潮
-            features['ad'] = talib.AD(df.high, df.low, df.close, df.volume)  # 累积/派发线
-            features['adosc'] = talib.ADOSC(df.high, df.low, df.close, df.volume)  # A/D震荡指标
+            obv = talib.OBV(df.close, df.volume)
+            ad = talib.AD(df.high, df.low, df.close, df.volume)
+            adosc = talib.ADOSC(df.high, df.low, df.close, df.volume)
+            
+            features['obv'] = obv.iloc[-1]
+            features['ad'] = ad.iloc[-1]
+            features['adosc'] = adosc.iloc[-1]
             
             # === 趋势确认指标 ===
             # DMI族
-            features['plus_di'] = talib.PLUS_DI(df.high, df.low, df.close)
-            features['minus_di'] = talib.MINUS_DI(df.high, df.low, df.close)
-            features['adx'] = talib.ADX(df.high, df.low, df.close)
-            features['adxr'] = talib.ADXR(df.high, df.low, df.close)
+            plus_di = talib.PLUS_DI(df.high, df.low, df.close)
+            minus_di = talib.MINUS_DI(df.high, df.low, df.close)
+            adx = talib.ADX(df.high, df.low, df.close)
+            adxr = talib.ADXR(df.high, df.low, df.close)
             
-            # === 其他综合指标 ===
-            # 威廉指标
-            features['willr'] = talib.WILLR(df.high, df.low, df.close)
+            features['plus_di'] = plus_di.iloc[-1]
+            features['minus_di'] = minus_di.iloc[-1]
+            features['adx'] = adx.iloc[-1]
+            features['adxr'] = adxr.iloc[-1]
             
-            # CCI
-            features['cci'] = talib.CCI(df.high, df.low, df.close)
-            
-            # 资金流向指标
-            features['mfi'] = talib.MFI(df.high, df.low, df.close, df.volume)
-            
-            # 相对强弱指数
-            features['dx'] = talib.DX(df.high, df.low, df.close)  # 动向指数
-            
-            # 价格动量指标
-            features['ppo'] = talib.PPO(df.close)  # 价格震荡百分比
-            features['ultosc'] = talib.ULTOSC(df.high, df.low, df.close)  # 终极波动指标
-            
-            # === 自定义组合指标 ===
-            # 均线交叉
-            features['ma_cross'] = (features['sma10'] - features['sma20']) / df.close
-            features['di_cross'] = features['plus_di'] - features['minus_di']
-            
-            # 趋势强度
-            features['trend_strength'] = features['adx'] * np.sign(features['di_cross'])
+            # DMI趋势强度
+            features['dmi_trend'] = (plus_di.iloc[-1] - minus_di.iloc[-1]) * adx.iloc[-1] / 100
+            features['dmi_cross'] = (plus_di.iloc[-1] - minus_di.iloc[-1])
+            features['dmi_trend_strength'] = 1 if adx.iloc[-1] > 25 else 0
             
         except Exception as e:
             print(f"计算技术指标出错: {str(e)}")
             
         return features
     
-    def _get_market_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """计算市场特征"""
-        features = pd.DataFrame()
+    def _get_market_features(self, df: pd.DataFrame) -> Dict[str, float]:
+        """计算最后一根K线的市场特征"""
+        features = {}
         
         try:
             # 价格归一化
@@ -206,46 +260,95 @@ class FeatureEngine:
             high_norm = self._normalize_series(df.high)
             low_norm = self._normalize_series(df.low)
             
-            features['norm_close'] = close_norm
-            features['norm_high'] = high_norm
-            features['norm_low'] = low_norm
+            features['norm_close'] = close_norm.iloc[-1]
+            features['norm_high'] = high_norm.iloc[-1]
+            features['norm_low'] = low_norm.iloc[-1]
             
             # 波动率特征
-            for period in [ 20]:
-                features[f'volatility_{period}'] = df.close.rolling(period).std() / df.close
+            for period in [5, 10, 20]:
+                volatility = df.close.rolling(period).std() / df.close
+                features[f'volatility_{period}'] = volatility.iloc[-1]
                 
             # 趋势特征
-            # for period in [5, 10, 20]:
-            #     features[f'trend_{period}'] = (df.close - df.close.shift(period)) / df.close.shift(period)
+            for period in [5, 10, 20]:
+                # 价格趋势
+                price_trend = (df.close.iloc[-1] - df.close.iloc[-period]) / df.close.iloc[-period]
+                features[f'price_trend_{period}'] = price_trend
                 
+                # 成交量趋势
+                volume_trend = (df.volume.iloc[-1] - df.volume.iloc[-period]) / df.volume.iloc[-period]
+                features[f'volume_trend_{period}'] = volume_trend
+            
+            # 价格区间特征
+            for period in [5, 10, 20]:
+                period_high = df.high.rolling(period).max().iloc[-1]
+                period_low = df.low.rolling(period).min().iloc[-1]
+                cur_price = df.close.iloc[-1]
+                
+                # 当前价格在区间的位置
+                price_position = (cur_price - period_low) / (period_high - period_low) if period_high != period_low else 0.5
+                features[f'price_position_{period}'] = price_position
+                
+                # 区间宽度
+                range_width = (period_high - period_low) / cur_price
+                features[f'range_width_{period}'] = range_width
+            
             # 成交量特征
-            features['volume_ratio'] = df.volume / df.volume.rolling(20).mean()
-            features['volume_trend'] = (df.volume - df.volume.shift(1)) / df.volume.shift(1)
+            volume_ma = df.volume.rolling(20).mean()
+            features['volume_ratio'] = df.volume.iloc[-1] / volume_ma.iloc[-1]
+            features['volume_ma_slope'] = (volume_ma.iloc[-1] - volume_ma.iloc[-2]) / volume_ma.iloc[-2]
+            
+            # 振幅特征
+            features['amplitude'] = (df.high.iloc[-1] - df.low.iloc[-1]) / df.open.iloc[-1]
+            features['amplitude_ma5'] = df.apply(
+                lambda x: (x['high'] - x['low']) / x['open'], 
+                axis=1
+            ).rolling(5).mean().iloc[-1]
+            
+            # 涨跌幅特征
+            features['return'] = (df.close.iloc[-1] - df.open.iloc[-1]) / df.open.iloc[-1]
+            features['return_ma5'] = ((df.close - df.open) / df.open).rolling(5).mean().iloc[-1]
             
         except Exception as e:
             print(f"计算市场特征出错: {str(e)}")
             
         return features
     
-    def _get_pattern_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """计算形态特征"""
-        features = pd.DataFrame()
+    def _get_pattern_features(self, df: pd.DataFrame) -> Dict[str, float]:
+        """计算最后一根K线的形态特征"""
+        features = {}
         
         try:
             # 蜡烛图形态
             pattern_funcs = [
-                talib.CDLDOJI,
-                talib.CDLENGULFING,
-                talib.CDLHARAMI,
-                talib.CDLHAMMER,
-                talib.CDLSHOOTINGSTAR
+                talib.CDLDOJI,           # 十字星
+                talib.CDLENGULFING,      # 吞没形态
+                talib.CDLHARAMI,         # 孕线
+                talib.CDLHAMMER,         # 锤子线
+                talib.CDLSHOOTINGSTAR,   # 流星线
+                talib.CDLMARUBOZU,       # 光头光脚/长实体
+                talib.CDLHANGINGMAN,     # 上吊线
+                talib.CDLMORNINGSTAR,    # 晨星
+                talib.CDLEVENINGSTAR,    # 暮星
+                talib.CDLPIERCING,       # 刺透形态
+                talib.CDLDARKCLOUDCOVER  # 乌云盖顶
             ]
             
             for func in pattern_funcs:
                 pattern_name = func.__name__.replace('CDL', '').lower()
-                features[f'pattern_{pattern_name}'] = func(
-                    df.open, df.high, df.low, df.close
-                )
+                pattern_value = func(df.open, df.high, df.low, df.close)
+                features[f'pattern_{pattern_name}'] = pattern_value.iloc[-1]
+            
+            # K线形态特征
+            features['body_size'] = abs(df.close.iloc[-1] - df.open.iloc[-1]) / df.open.iloc[-1]
+            features['upper_shadow'] = (df.high.iloc[-1] - max(df.open.iloc[-1], df.close.iloc[-1])) / df.open.iloc[-1]
+            features['lower_shadow'] = (min(df.open.iloc[-1], df.close.iloc[-1]) - df.low.iloc[-1]) / df.open.iloc[-1]
+            
+            # 连续K线形态
+            features['three_white_soldiers'] = 1 if (
+                df.close.iloc[-3:] > df.open.iloc[-3:]).all() else 0
+            features['three_black_crows'] = 1 if (
+                df.close.iloc[-3:] < df.open.iloc[-3:]).all() else 0
                 
         except Exception as e:
             print(f"计算形态特征出错: {str(e)}")
@@ -353,6 +456,25 @@ class FeatureEngine:
                     'bsp_count': 0,
                     'last_bsp_type': 0
                 })
+                features['fx_type'] = 0
+                features['fx_high'] = 0
+                features['fx_low'] = 0
+                
+                features['bi_direction'] = 0
+                features['bi_length'] = 0
+                features['bi_amp'] = 0
+                features['bi_is_sure'] = 0
+                features['bi_macd_area'] = 0
+                features['bi_macd_diff'] = 0
+                features['bi_macd_slope'] = 0
+                features['bi_macd_amp'] = 0
+                features['bi_macd_peak'] = 0
+                features['bi_macd_full_area'] = 0
+                features['bi_macd_volumn'] = 0
+                features['bi_macd_amount'] = 0
+                features['bi_macd_volumn_avg'] = 0
+                features['bi_macd_amount_avg'] = 0
+                features['bi_macd_turnrate_avg'] = 0
                 return features
                 
             # 获取最后一个买卖点
