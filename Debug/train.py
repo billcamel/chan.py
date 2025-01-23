@@ -127,7 +127,7 @@ if __name__ == "__main__":
             market_features = feature_engine.get_features(
                 kline_data, 
                 len(kline_data)-1,
-                bsp_list
+                chan_snapshot  # 传入缠论快照
             )
             bsp_dict[last_bsp.klu.idx]['feature'].add_feat(market_features)
 

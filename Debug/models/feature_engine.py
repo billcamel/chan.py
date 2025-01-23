@@ -7,7 +7,7 @@ import talib
 from enum import Enum, auto
 import json
 
-from Common.CEnum import BSP_TYPE
+from Common.CEnum import BI_DIR, BSP_TYPE, FX_TYPE, MACD_ALGO
 from .feature_processor import FeatureProcessor
 
 class FeatureType(Enum):
@@ -65,13 +65,13 @@ class FeatureEngine:
             
         return features_df
     
-    def get_features(self, kline_data: List[Any], idx: int, bsp_list: List = None) -> Dict[str, float]:
+    def get_features(self, kline_data: List[Any], idx: int, chan_snapshot: Any = None) -> Dict[str, float]:
         """获取某个时间点的所有特征
         
         Args:
             kline_data: K线数据列表
             idx: 当前K线索引
-            bsp_list: 缠论买卖点列表
+            chan_snapshot: 缠论快照对象，用于计算缠论相关特征
             
         Returns:
             特征字典
@@ -89,8 +89,8 @@ class FeatureEngine:
         features = {k: v for k, v in features.items() if pd.notna(v)}
         
         # 添加缠论特征
-        if FeatureType.PATTERN in self.enabled_types and bsp_list:
-            features.update(self._get_chan_features(bsp_list))
+        if FeatureType.PATTERN in self.enabled_types and chan_snapshot:
+            features.update(self._get_chan_features(chan_snapshot))
             
         return features
     
@@ -101,7 +101,7 @@ class FeatureEngine:
         try:
             # === 趋势类指标 ===
             # MA族
-            for period in [10, 20, 60]:
+            for period in [60, 120]:
                 features[f'sma{period}'] = talib.SMA(df.close, timeperiod=period)
                 features[f'ema{period}'] = talib.EMA(df.close, timeperiod=period)
                 features[f'wma{period}'] = talib.WMA(df.close, timeperiod=period)  # 加权移动平均
@@ -118,7 +118,7 @@ class FeatureEngine:
             
             # === 动量类指标 ===
             # RSI族
-            for period in [6, 12, 24]:
+            for period in [ 12, 24, 60]:
                 features[f'rsi_{period}'] = talib.RSI(df.close, timeperiod=period)
             
             # 随机指标族
@@ -331,43 +331,105 @@ class FeatureEngine:
             
         return plot_marker, feature_meta, X, y
 
-    def _get_chan_features(self, bsp_list: List) -> Dict[str, float]:
+    def _get_chan_features(self, chan_snapshot: Any) -> Dict[str, float]:
         """计算缠论特征
         
         Args:
-            bsp_list: 缠论买卖点列表
+            chan_snapshot: 缠论快照对象
             
         Returns:
             缠论特征字典
         """
         features = {}
         
-        if not bsp_list or len(bsp_list) < 4:
-            features['bsp_d1'] = 0
-            features['bsp_d2'] = 0 
-            features['bsp_d3'] = 0
-            return features
+        try:
+            # 获取买卖点列表
+            bsp_list = chan_snapshot.get_bsp()
+            if not bsp_list or len(bsp_list) < 4:
+                features.update({
+                    'bsp_d1': 0,
+                    'bsp_d2': 0,
+                    'bsp_d3': 0,
+                    'bsp_count': 0,
+                    'last_bsp_type': 0
+                })
+                return features
+                
+            # 获取最后一个买卖点
+            last_bsp = bsp_list[-1]
             
-        # 获取最后一个买卖点
-        last_bsp = bsp_list[-1]
-        
-        # 计算最近4个买卖点之间的距离特征
-        last_bsp2 = bsp_list[-2]
-        last_bsp3 = bsp_list[-3] 
-        last_bsp4 = bsp_list[-4]
-        
-        # 计算相邻买卖点之间的欧氏距离
-        dk1 = last_bsp.klu.idx - last_bsp2.klu.idx # k线距离
-        dp1 = abs(last_bsp.klu.close - last_bsp2.klu.close) # 价格差
-        features['bsp_d1'] = math.sqrt(dp1*dp1 + dk1*dk1)
-        
-        dk2 = last_bsp2.klu.idx - last_bsp3.klu.idx # k线距离
-        dp2 = abs(last_bsp2.klu.close - last_bsp3.klu.close) # 价格差
-        features['bsp_d2'] = math.sqrt(dp2*dp2 + dk2*dk2)
-        
-        dk3 = last_bsp3.klu.idx - last_bsp4.klu.idx # k线距离
-        dp3 = abs(last_bsp3.klu.close - last_bsp4.klu.close) # 价格差
-        features['bsp_d3'] = math.sqrt(dp3*dp3 + dk3*dk3)
+            # 计算最近4个买卖点之间的距离特征
+            last_bsp2 = bsp_list[-2]
+            last_bsp3 = bsp_list[-3] 
+            last_bsp4 = bsp_list[-4]
+            
+            # 计算相邻买卖点之间的欧氏距离
+            dk1 = last_bsp.klu.idx - last_bsp2.klu.idx # k线距离
+            dp1 = abs(last_bsp.klu.close - last_bsp2.klu.close) # 价格差
+            features['bsp_d1'] = math.sqrt(dp1*dp1 + dk1*dk1)
+            
+            dk2 = last_bsp2.klu.idx - last_bsp3.klu.idx
+            dp2 = abs(last_bsp2.klu.close - last_bsp3.klu.close)
+            features['bsp_d2'] = math.sqrt(dp2*dp2 + dk2*dk2)
+            
+            dk3 = last_bsp3.klu.idx - last_bsp4.klu.idx
+            dp3 = abs(last_bsp3.klu.close - last_bsp4.klu.close)
+            features['bsp_d3'] = math.sqrt(dp3*dp3 + dk3*dk3)
+            
+            # 添加买卖点统计特征
+            features['bsp_count'] = len(bsp_list)
+            features['last_bsp_type'] = 1 if last_bsp.is_buy else -1
+            
+            # 获取当前级别的缠论对象
+            cur_lv_chan = chan_snapshot[0]
+            
+            # 添加分型特征
+            if cur_lv_chan[-2].fx:
+                features['fx_type'] = 1 if cur_lv_chan[-2].fx == FX_TYPE.BOTTOM else -1
+                features['fx_high'] = cur_lv_chan[-2].high
+                features['fx_low'] = cur_lv_chan[-2].low
+            else:
+                features['fx_type'] = 0
+                features['fx_high'] = 0
+                features['fx_low'] = 0
+                
+            # 添加笔的特征
+            if cur_lv_chan.bi_list:
+                last_bi = cur_lv_chan.bi_list[-1]
+                features['bi_direction'] = 1 if last_bi.dir == BI_DIR.UP else -1
+                features['bi_length'] = last_bi.get_klu_cnt()
+                features['bi_amp'] = last_bi.amp()  
+                features['bi_is_sure'] = last_bi.is_sure
+                features['bi_macd_area'] = last_bi.cal_macd_metric(MACD_ALGO.AREA, False)
+                features['bi_macd_diff'] = last_bi.cal_macd_metric(MACD_ALGO.DIFF, False)
+                features['bi_macd_slope'] = last_bi.cal_macd_metric(MACD_ALGO.SLOPE, False)
+                features['bi_macd_amp'] = last_bi.cal_macd_metric(MACD_ALGO.AMP, False)
+                features['bi_macd_peak'] = last_bi.cal_macd_metric(MACD_ALGO.PEAK, False)
+                features['bi_macd_full_area'] = last_bi.cal_macd_metric(MACD_ALGO.FULL_AREA, False)
+                features['bi_macd_volumn'] = last_bi.cal_macd_metric(MACD_ALGO.VOLUMN, False)
+                features['bi_macd_amount'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT, False)
+                features['bi_macd_volumn_avg'] = last_bi.cal_macd_metric(MACD_ALGO.VOLUMN_AVG, False)
+                features['bi_macd_amount_avg'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT_AVG, False)
+                features['bi_macd_turnrate_avg'] = last_bi.cal_macd_metric(MACD_ALGO.TURNRATE_AVG, False)
+            else:
+                features['bi_direction'] = 0
+                features['bi_length'] = 0
+                features['bi_amp'] = 0
+                features['bi_is_sure'] = 0
+                features['bi_macd_area'] = 0
+                features['bi_macd_diff'] = 0
+                features['bi_macd_slope'] = 0
+                features['bi_macd_amp'] = 0
+                features['bi_macd_peak'] = 0
+                features['bi_macd_full_area'] = 0
+                features['bi_macd_volumn'] = 0
+                features['bi_macd_amount'] = 0
+                features['bi_macd_volumn_avg'] = 0
+                features['bi_macd_amount_avg'] = 0
+                features['bi_macd_turnrate_avg'] = 0
+                
+        except Exception as e:
+            print(f"计算缠论特征出错: {str(e)}")
             
         return features
 
