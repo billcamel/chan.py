@@ -232,7 +232,8 @@ if __name__ == "__main__":
             "begin_time": begin_time,
             "end_time": end_time,
             "data_src": str(data_src)
-        }
+        },
+        metrics=metrics  # 添加评估指标
     )
     
     print(f"\n模型已保存到: {model_dir}")

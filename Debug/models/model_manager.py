@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 import json
 import shutil
+from typing import Dict
 
 class ModelManager:
     """简单的模型管理器"""
@@ -28,32 +29,36 @@ class ModelManager:
         return model_dir
         
     def save_model(self, model_dir: str, model_path: str, meta_path: str, processor_path: str, 
-                  chan_config: dict = None, train_info: dict = None) -> None:
-        """保存模型文件到指定目录
+                  chan_config: Dict, train_info: Dict, metrics: Dict = None) -> None:
+        """保存模型和相关文件
         
         Args:
             model_dir: 模型目录
             model_path: 模型文件路径
             meta_path: 特征映射文件路径
             processor_path: 特征处理器文件路径
-            chan_config: 缠论配置字典
-            train_info: 训练信息，包含品种、周期等
+            chan_config: 缠论配置
+            train_info: 训练信息
+            metrics: 训练评估指标
         """
-        # 复制文件到模型目录
+        # 复制模型文件
         shutil.copy2(model_path, os.path.join(model_dir, "model.json"))
         shutil.copy2(meta_path, os.path.join(model_dir, "feature.meta"))
         shutil.copy2(processor_path, os.path.join(model_dir, "feature_processor.joblib"))
         
-        # 合并配置信息到train_info
-        if train_info is None:
-            train_info = {}
-        if chan_config:
-            train_info['chan_config'] = chan_config
-            
+        # 添加缠论配置到训练信息
+        train_info['chan_config'] = chan_config
+        
+        # 添加评估指标到训练信息
+        if metrics:
+            train_info['metrics'] = {
+                'train': metrics['train'],
+                'val': metrics['val']
+            }
+        
         # 保存训练信息
-        if train_info:
-            with open(os.path.join(model_dir, "train_info.json"), "w") as f:
-                json.dump(train_info, f, indent=2) 
+        with open(os.path.join(model_dir, "train_info.json"), "w") as f:
+            json.dump(train_info, f, indent=2)
 
     def is_model_dir(self, directory: str) -> bool:
         """检查目录是否是有效的模型目录

@@ -52,9 +52,18 @@ if __name__ == "__main__":
     lv_list = [kl_type]
 
     config = CChanConfig({
-        "trigger_step": True,
-        "divergence_rate": 0.8,
-        "min_zs_cnt": 1,
+        "trigger_step": True,  # 打开开关！
+        "bi_strict": True,
+        "skip_step": 0,
+        "divergence_rate": float("inf"),
+        "bsp2_follow_1": False,
+        "bsp3_follow_1": False,
+        "min_zs_cnt": 0,
+        "bs1_peak": False,
+        "macd_algo": "peak",
+        "bs_type": '1,1p',
+        "print_warning": True,
+        "zs_algo": "normal",
     })
 
     chan = CChan(
