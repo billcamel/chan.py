@@ -4,7 +4,13 @@ __pycache__
 *.vscode
 *.log
 *.db
+*.DS_Store
 config.yaml
 OpenConfig.yaml
 gotify_push.py
 cos_config.yaml
+Debug/models/*
+Debug/*.png
+Debug/*.joblib
+Debug/*.json
+Debug/*.meta
