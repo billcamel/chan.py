@@ -139,7 +139,7 @@ if __name__ == "__main__":
         features = feature_engine.get_features(
             kline_data, 
             len(kline_data)-1,
-            bsp_list  # 添加bsp_list参数
+            chan_snapshot  # 传入缠论快照
         )
         
         # 预测买卖点的概率

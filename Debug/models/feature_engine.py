@@ -325,13 +325,10 @@ class FeatureEngine:
                 talib.CDLENGULFING,      # 吞没形态
                 talib.CDLHARAMI,         # 孕线
                 talib.CDLHAMMER,         # 锤子线
-                talib.CDLSHOOTINGSTAR,   # 流星线
                 talib.CDLMARUBOZU,       # 光头光脚/长实体
                 talib.CDLHANGINGMAN,     # 上吊线
                 talib.CDLMORNINGSTAR,    # 晨星
                 talib.CDLEVENINGSTAR,    # 暮星
-                talib.CDLPIERCING,       # 刺透形态
-                talib.CDLDARKCLOUDCOVER  # 乌云盖顶
             ]
             
             for func in pattern_funcs:
@@ -471,10 +468,10 @@ class FeatureEngine:
                 features['bi_macd_peak'] = 0
                 features['bi_macd_full_area'] = 0
                 features['bi_macd_volumn'] = 0
-                features['bi_macd_amount'] = 0
+                # features['bi_macd_amount'] = 0
                 features['bi_macd_volumn_avg'] = 0
-                features['bi_macd_amount_avg'] = 0
-                features['bi_macd_turnrate_avg'] = 0
+                # features['bi_macd_amount_avg'] = 0
+                # features['bi_macd_turnrate_avg'] = 0
                 return features
                 
             # 获取最后一个买卖点
@@ -529,10 +526,10 @@ class FeatureEngine:
                 features['bi_macd_peak'] = last_bi.cal_macd_metric(MACD_ALGO.PEAK, False)
                 features['bi_macd_full_area'] = last_bi.cal_macd_metric(MACD_ALGO.FULL_AREA, False)
                 features['bi_macd_volumn'] = last_bi.cal_macd_metric(MACD_ALGO.VOLUMN, False)
-                features['bi_macd_amount'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT, False)
+                # features['bi_macd_amount'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT, False)
                 features['bi_macd_volumn_avg'] = last_bi.cal_macd_metric(MACD_ALGO.VOLUMN_AVG, False)
-                features['bi_macd_amount_avg'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT_AVG, False)
-                features['bi_macd_turnrate_avg'] = last_bi.cal_macd_metric(MACD_ALGO.TURNRATE_AVG, False)
+                # features['bi_macd_amount_avg'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT_AVG, False)
+                # features['bi_macd_turnrate_avg'] = last_bi.cal_macd_metric(MACD_ALGO.TURNRATE_AVG, False)
             else:
                 features['bi_direction'] = 0
                 features['bi_length'] = 0
@@ -545,10 +542,10 @@ class FeatureEngine:
                 features['bi_macd_peak'] = 0
                 features['bi_macd_full_area'] = 0
                 features['bi_macd_volumn'] = 0
-                features['bi_macd_amount'] = 0
+                # features['bi_macd_amount'] = 0
                 features['bi_macd_volumn_avg'] = 0
-                features['bi_macd_amount_avg'] = 0
-                features['bi_macd_turnrate_avg'] = 0
+                # features['bi_macd_amount_avg'] = 0
+                # features['bi_macd_turnrate_avg'] = 0
                 
         except Exception as e:
             print(f"计算缠论特征出错: {str(e)}")

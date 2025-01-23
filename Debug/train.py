@@ -138,8 +138,33 @@ if __name__ == "__main__":
     print(market_features)
 
     # 生成特征数据
-    bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
+    bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp() 
+                   if BSP_TYPE.T1 in bsp.type or BSP_TYPE.T1P in bsp.type]  # 只考虑一类买卖点
     plot_marker, feature_meta, X, y = feature_engine.save_features(bsp_dict, bsp_academy)
+    
+    # 打印标签分布
+    print("\n标签分布:")
+    print(f"总样本数: {len(y)}")
+    print(f"正样本数: {sum(y)}")
+    print(f"负样本数: {len(y) - sum(y)}")
+    print(f"正样本比例: {sum(y)/len(y):.2%}")
+    
+    # 检查特征值分布
+    print("\n特征值检查:")
+    print("特征最大值:", X.max(axis=0))
+    print("特征最小值:", X.min(axis=0))
+    print("特征均值:", X.mean(axis=0))
+    print("特征标准差:", X.std(axis=0))
+    
+    # 检查是否有无效特征
+    invalid_features = []
+    for i, feat_name in enumerate(feature_meta.keys()):
+        if np.all(X[:, i] == 0) or np.all(np.isnan(X[:, i])) or np.all(np.isinf(X[:, i])):
+            invalid_features.append(feat_name)
+    if invalid_features:
+        print("\n发现无效特征:")
+        for feat in invalid_features:
+            print(f"- {feat}")
     
     # 画图检查label是否正确
     # plot(chan, plot_marker)
