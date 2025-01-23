@@ -26,7 +26,7 @@ class FeatureEngine:
         Args:
             enabled_types: 启用的特征类型列表
         """
-        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET, FeatureType.PATTERN, FeatureType.CHAN]
+        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET, FeatureType.CHAN]
         # 固定参数
         self.normalize_window = 100  # 归一化窗口
         
@@ -110,9 +110,9 @@ class FeatureEngine:
             ma_values = {}  # 存储不同周期的均线值
             
             for period in ma_periods:
-                sma = talib.SMA(df.close, timeperiod=period)
-                ema = talib.EMA(df.close, timeperiod=period)
-                wma = talib.WMA(df.close, timeperiod=period)
+                sma = talib.SMA(df.close[-2*period:], timeperiod=period)
+                ema = talib.EMA(df.close[-2*period:], timeperiod=period)
+                wma = talib.WMA(df.close[-2*period:], timeperiod=period)
                 
                 ma_values[f'sma{period}'] = sma.iloc[-1]
                 ma_values[f'ema{period}'] = ema.iloc[-1]
@@ -145,7 +145,7 @@ class FeatureEngine:
                                           if ma_values[f'sma{ma_periods[i]}'] < ma_values[f'sma{ma_periods[i+1]}'])
             
             # MACD族
-            macd, signal, hist = talib.MACD(df.close)
+            macd, signal, hist = talib.MACD(df.close[-2*20:])
             features['macd'] = macd.iloc[-1]
             features['macd_signal'] = signal.iloc[-1]
             features['macd_hist'] = hist.iloc[-1]
@@ -157,15 +157,15 @@ class FeatureEngine:
             features['macd_hist_slope'] = (hist.iloc[-1] - hist.iloc[-2]) / abs(hist.iloc[-2]) if hist.iloc[-2] != 0 else 0  # 柱状图斜率
             
             # 抛物线转向 - SAR
-            sar = talib.SAR(df.high, df.low)
+            sar = talib.SAR(df.high[-2*20:], df.low[-2*20:])
             features['sar'] = sar.iloc[-1]
             features['sar_ratio'] = (df.close.iloc[-1] - sar.iloc[-1]) / df.close.iloc[-1]
             features['sar_slope'] = (sar.iloc[-1] - sar.iloc[-2]) / sar.iloc[-2]
             
             # === 动量类指标 ===
             # RSI族
-            for period in [6, 12, 24, 60]:
-                rsi = talib.RSI(df.close, timeperiod=period)
+            for period in [12, 24, 60]:
+                rsi = talib.RSI(df.close[-2*period:], timeperiod=period)
                 features[f'rsi_{period}'] = rsi.iloc[-1]
                 # RSI变化率
                 features[f'rsi_{period}_slope'] = (rsi.iloc[-1] - rsi.iloc[-2]) / rsi.iloc[-2]
@@ -174,8 +174,8 @@ class FeatureEngine:
                 features[f'rsi_{period}_oversold'] = 1 if rsi.iloc[-1] < 30 else 0
             
             # 随机指标族
-            slowk, slowd = talib.STOCH(df.high, df.low, df.close)
-            fastk, fastd = talib.STOCHF(df.high, df.low, df.close)
+            slowk, slowd = talib.STOCH(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
+            fastk, fastd = talib.STOCHF(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
             features['slowk'] = slowk.iloc[-1]
             features['slowd'] = slowd.iloc[-1]
             features['fastk'] = fastk.iloc[-1]
@@ -188,9 +188,9 @@ class FeatureEngine:
             
             # 动量指标
             for period in [10, 20]:
-                mom = talib.MOM(df.close, timeperiod=period)
-                roc = talib.ROC(df.close, timeperiod=period)
-                trix = talib.TRIX(df.close, timeperiod=period)
+                mom = talib.MOM(df.close[-2*period:], timeperiod=period)
+                roc = talib.ROC(df.close[-2*period:], timeperiod=period)
+                trix = talib.TRIX(df.close[-2*period:], timeperiod=period)
                 
                 features[f'mom_{period}'] = mom.iloc[-1]
                 features[f'roc_{period}'] = roc.iloc[-1]
@@ -198,7 +198,7 @@ class FeatureEngine:
             
             # === 波动类指标 ===
             # 布林带
-            upper, middle, lower = talib.BBANDS(df.close)
+            upper, middle, lower = talib.BBANDS(df.close[-2*20:])
             features['boll'] = middle.iloc[-1]
             features['boll_ub'] = upper.iloc[-1]
             features['boll_lb'] = lower.iloc[-1]
@@ -206,8 +206,8 @@ class FeatureEngine:
             features['boll_position'] = (df.close.iloc[-1] - lower.iloc[-1]) / (upper.iloc[-1] - lower.iloc[-1])
             
             # ATR族
-            atr = talib.ATR(df.high, df.low, df.close)
-            natr = talib.NATR(df.high, df.low, df.close)
+            atr = talib.ATR(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
+            natr = talib.NATR(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
             features['atr'] = atr.iloc[-1]
             features['natr'] = natr.iloc[-1]
             features['atr_ratio'] = atr.iloc[-1] / df.close.iloc[-1]
@@ -215,14 +215,14 @@ class FeatureEngine:
             # === 成交量类指标 ===
             # 成交量均线
             for period in [5, 10, 20]:
-                vol_sma = talib.SMA(df.volume, timeperiod=period)
+                vol_sma = talib.SMA(df.volume[-2*period:], timeperiod=period)
                 features[f'volume_sma{period}'] = vol_sma.iloc[-1]
                 features[f'volume_sma{period}_ratio'] = df.volume.iloc[-1] / vol_sma.iloc[-1]
             
             # 成交量动量指标
-            obv = talib.OBV(df.close, df.volume)
-            ad = talib.AD(df.high, df.low, df.close, df.volume)
-            adosc = talib.ADOSC(df.high, df.low, df.close, df.volume)
+            obv = talib.OBV(df.close[-2*20:], df.volume[-2*20:])
+            ad = talib.AD(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:], df.volume[-2*20:])
+            adosc = talib.ADOSC(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:], df.volume[-2*20:])
             
             features['obv'] = obv.iloc[-1]
             features['ad'] = ad.iloc[-1]
@@ -230,10 +230,10 @@ class FeatureEngine:
             
             # === 趋势确认指标 ===
             # DMI族
-            plus_di = talib.PLUS_DI(df.high, df.low, df.close)
-            minus_di = talib.MINUS_DI(df.high, df.low, df.close)
-            adx = talib.ADX(df.high, df.low, df.close)
-            adxr = talib.ADXR(df.high, df.low, df.close)
+            plus_di = talib.PLUS_DI(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
+            minus_di = talib.MINUS_DI(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
+            adx = talib.ADX(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
+            adxr = talib.ADXR(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])
             
             features['plus_di'] = plus_di.iloc[-1]
             features['minus_di'] = minus_di.iloc[-1]
