@@ -2,7 +2,7 @@
 from typing import Dict, Tuple, List, Optional
 import numpy as np
 import xgboost as xgb
-from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, matthews_corrcoef
 from sklearn.model_selection import train_test_split, GridSearchCV, cross_validate
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -68,13 +68,17 @@ class ModelTrainer:
     def _calculate_metrics(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict:
         """计算评估指标"""
         pred_labels = y_pred > 0.5
-        return {
+        metrics = {
             'auc': roc_auc_score(y_true, y_pred),
             'accuracy': accuracy_score(y_true, pred_labels),
             'precision': precision_score(y_true, pred_labels),
             'recall': recall_score(y_true, pred_labels),
-            'f1': f1_score(y_true, pred_labels)
+            'f1': f1_score(y_true, pred_labels),
+            'fpr': confusion_matrix(y_true, pred_labels).ravel()[2] / (confusion_matrix(y_true, pred_labels).ravel()[2] + confusion_matrix(y_true, pred_labels).ravel()[3]),
+            'mcc': matthews_corrcoef(y_true, pred_labels)
         }
+        
+        return metrics
     
     def plot_training_curves(self):
         """绘制训练曲线"""

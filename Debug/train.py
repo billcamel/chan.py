@@ -4,6 +4,7 @@ from typing import Dict, TypedDict
 import numpy as np
 import xgboost as xgb
 import os,sys
+
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
@@ -14,7 +15,7 @@ from ChanConfig import CChanConfig
 from ChanModel.Features import CFeatures
 from Common.CEnum import AUTYPE, BSP_TYPE, DATA_SRC, KL_TYPE
 from Common.CTime import CTime
-from Plot.PlotDriver import CPlotDriver
+from Plot.PlotlyDriver import CPlotlyDriver
 from models.trainer import ModelTrainer
 from models.feature_engine import FeatureEngine, FeatureType
 from models.model_manager import ModelManager
@@ -43,12 +44,13 @@ def plot(chan, plot_marker):
             "markers": plot_marker
         }
     }
-    plot_driver = CPlotDriver(
+    plot_driver = CPlotlyDriver(
         chan,
         plot_config=plot_config,
         plot_para=plot_para,
     )
-    plot_driver.save2img("label.png")
+    plot_driver.figure.show()
+    # plot_driver.save2img("label.png")
 
 
 def stragety_feature(last_klu):
@@ -161,11 +163,30 @@ if __name__ == "__main__":
     # 输出训练和验证集评估指标
     print("\n训练集评估指标:")
     for name, value in metrics['train'].items():
-        print(f"{name}: {value:.4f}")
+        # 添加中文说明
+        metric_name = {
+            'auc': 'AUC值(auc)',
+            'accuracy': '准确率(accuracy)',
+            'precision': '精确率(precision)',
+            'recall': '召回率(recall)',
+            'f1': 'F1值(f1)',
+            'fpr': '假正例率(fpr)',
+            'mcc': '马修斯相关系数(mcc)'
+        }.get(name, name)
+        print(f"{metric_name}: {value:.4f}")
         
     print("\n验证集评估指标:")
     for name, value in metrics['val'].items():
-        print(f"{name}: {value:.4f}")
+        metric_name = {
+            'auc': 'AUC值(auc)',
+            'accuracy': '准确率(accuracy)',
+            'precision': '精确率(precision)',
+            'recall': '召回率(recall)',
+            'f1': 'F1值(f1)',
+            'fpr': '假正例率(fpr)',
+            'mcc': '马修斯相关系数(mcc)'
+        }.get(name, name)
+        print(f"{metric_name}: {value:.4f}")
     
     # 绘制训练曲线
     trainer.plot_training_curves()
