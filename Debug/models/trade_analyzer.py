@@ -138,15 +138,15 @@ class TradeAnalyzer:
         trade_points = []
         last_buy_price = None
         
-        for trade in self.trade_history:
-            if trade['prob'] <= 0.6:
-                continue
+        for trade in sorted(self.trade_history, key=lambda x: x['time']):
+            # if trade['prob'] <= 0.6:
+            #     continue
                 
             if trade['is_buy']:
                 # 买入时记录点位和价格
                 last_buy_price = trade['price']
                 trade_points.append({
-                    'time': trade['time'],
+                    'time': trade['time'].to_str(),
                     'capital': capital,
                     'type': 'buy'
                 })
@@ -156,11 +156,11 @@ class TradeAnalyzer:
                     profit = (trade['price'] - last_buy_price) / last_buy_price
                     capital *= (1 + profit)
                     equity_data.append({
-                        'time': trade['time'],
+                        'time': trade['time'].to_str(),
                         'capital': capital
                     })
                     trade_points.append({
-                        'time': trade['time'],
+                        'time': trade['time'].to_str(),
                         'capital': capital,
                         'type': 'sell'
                     })
@@ -178,14 +178,14 @@ class TradeAnalyzer:
         capitals = [d['capital'] for d in equity_data]
         plt.plot(times, capitals, 'b-', label='资金曲线')
         
-        # 标记买卖点
-        for point in trade_points:
-            if point['type'] == 'buy':
-                plt.plot(point['time'], point['capital'], 'g^', markersize=8, 
-                        label='买入点' if '买入点' not in plt.gca().get_legend_handles_labels()[1] else "")
-            else:
-                plt.plot(point['time'], point['capital'], 'rv', markersize=8,
-                        label='卖出点' if '卖出点' not in plt.gca().get_legend_handles_labels()[1] else "")
+        # # 标记买卖点
+        # for point in trade_points:
+        #     if point['type'] == 'buy':
+        #         plt.plot(point['time'], point['capital'], 'g^', markersize=8, 
+        #                 label='买入点' if '买入点' not in plt.gca().get_legend_handles_labels()[1] else "")
+        #     else:
+        #         plt.plot(point['time'], point['capital'], 'rv', markersize=8,
+        #                 label='卖出点' if '卖出点' not in plt.gca().get_legend_handles_labels()[1] else "")
         
         plt.title('交易资金曲线')
         plt.xlabel('时间')
