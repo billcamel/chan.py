@@ -26,7 +26,7 @@ class FeatureEngine:
         Args:
             enabled_types: 启用的特征类型列表
         """
-        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.MARKET, FeatureType.CHAN]
+        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.CHAN]
         # 固定参数
         self.normalize_window = 100  # 归一化窗口
         
@@ -255,59 +255,59 @@ class FeatureEngine:
         features = {}
         
         try:
-            # 价格归一化
-            close_norm = self._normalize_series(df.close)
-            high_norm = self._normalize_series(df.high)
-            low_norm = self._normalize_series(df.low)
+            # # 价格归一化
+            # close_norm = self._normalize_series(df.close)
+            # high_norm = self._normalize_series(df.high)
+            # low_norm = self._normalize_series(df.low)
             
-            features['norm_close'] = close_norm.iloc[-1]
-            features['norm_high'] = high_norm.iloc[-1]
-            features['norm_low'] = low_norm.iloc[-1]
+            # features['norm_close'] = close_norm.iloc[-1]
+            # features['norm_high'] = high_norm.iloc[-1]
+            # features['norm_low'] = low_norm.iloc[-1]
             
-            # 波动率特征
-            for period in [5, 10, 20]:
-                volatility = df.close.rolling(period).std() / df.close
-                features[f'volatility_{period}'] = volatility.iloc[-1]
+            # # 波动率特征
+            # for period in [5, 10, 20]:
+            #     volatility = df.close.rolling(period).std() / df.close
+            #     features[f'volatility_{period}'] = volatility.iloc[-1]
                 
-            # 趋势特征
-            for period in [5, 10, 20]:
-                # 价格趋势
-                price_trend = (df.close.iloc[-1] - df.close.iloc[-period]) / df.close.iloc[-period]
-                features[f'price_trend_{period}'] = price_trend
+            # # 趋势特征
+            # for period in [5, 10, 20]:
+            #     # 价格趋势
+            #     price_trend = (df.close.iloc[-1] - df.close.iloc[-period]) / df.close.iloc[-period]
+            #     features[f'price_trend_{period}'] = price_trend
                 
-                # 成交量趋势
-                volume_trend = (df.volume.iloc[-1] - df.volume.iloc[-period]) / df.volume.iloc[-period]
-                features[f'volume_trend_{period}'] = volume_trend
+            #     # 成交量趋势
+            #     volume_trend = (df.volume.iloc[-1] - df.volume.iloc[-period]) / df.volume.iloc[-period]
+            #     features[f'volume_trend_{period}'] = volume_trend
             
-            # 价格区间特征
-            for period in [5, 10, 20]:
-                period_high = df.high.rolling(period).max().iloc[-1]
-                period_low = df.low.rolling(period).min().iloc[-1]
-                cur_price = df.close.iloc[-1]
+            # # 价格区间特征
+            # for period in [5, 10, 20]:
+            #     period_high = df.high.rolling(period).max().iloc[-1]
+            #     period_low = df.low.rolling(period).min().iloc[-1]
+            #     cur_price = df.close.iloc[-1]
                 
-                # 当前价格在区间的位置
-                price_position = (cur_price - period_low) / (period_high - period_low) if period_high != period_low else 0.5
-                features[f'price_position_{period}'] = price_position
+            #     # 当前价格在区间的位置
+            #     price_position = (cur_price - period_low) / (period_high - period_low) if period_high != period_low else 0.5
+            #     features[f'price_position_{period}'] = price_position
                 
-                # 区间宽度
-                range_width = (period_high - period_low) / cur_price
-                features[f'range_width_{period}'] = range_width
+            #     # 区间宽度
+            #     range_width = (period_high - period_low) / cur_price
+            #     features[f'range_width_{period}'] = range_width
             
             # 成交量特征
-            volume_ma = df.volume.rolling(20).mean()
+            volume_ma = df.volume[-2*20:].rolling(20).mean()
             features['volume_ratio'] = df.volume.iloc[-1] / volume_ma.iloc[-1]
             features['volume_ma_slope'] = (volume_ma.iloc[-1] - volume_ma.iloc[-2]) / volume_ma.iloc[-2]
             
             # 振幅特征
             features['amplitude'] = (df.high.iloc[-1] - df.low.iloc[-1]) / df.open.iloc[-1]
-            features['amplitude_ma5'] = df.apply(
+            features['amplitude_ma5'] = df[-2*5:].apply(
                 lambda x: (x['high'] - x['low']) / x['open'], 
                 axis=1
             ).rolling(5).mean().iloc[-1]
             
             # 涨跌幅特征
-            features['return'] = (df.close.iloc[-1] - df.open.iloc[-1]) / df.open.iloc[-1]
-            features['return_ma5'] = ((df.close - df.open) / df.open).rolling(5).mean().iloc[-1]
+            features['return'] = (df.close[-2*20:].iloc[-1] - df.open[-2*20:].iloc[-1]) / df.open[-2*20:].iloc[-1]
+            features['return_ma5'] = ((df.close[-2*20:] - df.open[-2*20:]) / df.open[-2*20:]).rolling(5).mean().iloc[-1]
             
         except Exception as e:
             print(f"计算市场特征出错: {str(e)}")
