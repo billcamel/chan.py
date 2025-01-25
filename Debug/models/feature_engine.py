@@ -444,7 +444,7 @@ class FeatureEngine:
         
         try:
             # 获取买卖点列表
-            bsp_list = chan_snapshot.get_bsp()
+            bsp_list = chan_snapshot.get_bsp(0)
             if not bsp_list or len(bsp_list) < 4:
                 features.update({
                     'bsp_d1': 0,

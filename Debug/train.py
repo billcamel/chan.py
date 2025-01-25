@@ -71,7 +71,7 @@ if __name__ == "__main__":
     end_time = "2021-01-01"
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_60M]
+    lv_list = [KL_TYPE.K_60M, KL_TYPE.K_15M]
 
     config = CChanConfig({
         "trigger_step": True,  # 打开开关！
@@ -108,7 +108,7 @@ if __name__ == "__main__":
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
         kline_data.append(last_klu)
-        bsp_list = chan_snapshot.get_bsp()
+        bsp_list = chan_snapshot.get_bsp(0)
         if not bsp_list:
             continue
         last_bsp = bsp_list[-1]
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     print(market_features)
 
     # 生成特征数据
-    bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp() 
+    bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp(0) 
                    if BSP_TYPE.T1 in bsp.type or BSP_TYPE.T1P in bsp.type]  # 只考虑一类买卖点
     plot_marker, feature_meta, X, y = feature_engine.save_features(bsp_dict, bsp_academy)
     
