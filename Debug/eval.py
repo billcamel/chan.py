@@ -90,29 +90,18 @@ if __name__ == "__main__":
     # 初始化模型管理器
     model_manager = ModelManager()
     
-    # 获取最新模型目录
-    model_dir = model_manager.get_latest_model()
-    if model_dir is None:
+    # 加载模型和相关文件
+    model_dir = model_manager.get_latest_model_dir()
+    if not model_dir:
         raise ValueError("未找到可用的模型")
-    
-    # 加载模型文件
-    model = xgb.Booster()
-    model.load_model(os.path.join(model_dir, "model.json"))
-    
-    # 加载特征映射和处理器
-    with open(os.path.join(model_dir, "feature.meta"), "r") as f:
-        feature_meta = json.load(f)
-    processor = FeatureProcessor.load(os.path.join(model_dir, "feature_processor.joblib"))
+        
+    model, feature_meta, processor = model_manager.load_model(model_dir)
     
     # 加载训练信息
     with open(os.path.join(model_dir, "train_info.json"), "r") as f:
         train_info = json.load(f)
-        
-    print(f"\n加载模型: {model_dir}")
-    print("训练信息:")
-    print(f"品种: {train_info['code']}")
-    print(f"周期: {train_info['kl_type']}")
-    print(f"训练数据: {train_info['begin_time']} - {train_info['end_time']}")
+    print(f"使用模型: {model_dir}")
+    print(f"训练时间: {train_info['train_time']}")
     
     # 初始化特征引擎
     feature_engine = FeatureEngine()

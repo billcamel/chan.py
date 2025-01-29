@@ -419,15 +419,15 @@ class FeatureEngine:
         if np.any(np.isinf(X)):
             print("警告: 特征矩阵包含Inf值")
         
-        # 特征归一化
-        processor = FeatureProcessor()
-        processor.fit(X, list(feature_meta.keys()))
-        X = processor.transform(X)
+        # # 特征归一化
+        # processor = FeatureProcessor()
+        # processor.fit(X, list(feature_meta.keys()))
+        # X = processor.transform(X)
         
-        # 保存特征处理器和特征meta
-        processor.save("feature_processor.joblib")
-        with open("feature.meta", "w") as fid:
-            json.dump(feature_meta, fid, indent=2)
+        # # 保存特征处理器和特征meta
+        # processor.save("feature_processor.joblib")
+        # with open("feature.meta", "w") as fid:
+        #     json.dump(feature_meta, fid, indent=2)
             
         return plot_marker, feature_meta, X, y
 

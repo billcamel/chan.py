@@ -13,3 +13,7 @@ Debug/*.png
 *.joblib
 *.json
 *.meta
+Debug/AutogluonModels/*
+*.pkl
+*.ubj
+version.txt

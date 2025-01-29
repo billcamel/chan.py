@@ -1,9 +1,12 @@
 import json
+from platform import processor
 from typing import Dict, TypedDict
+from datetime import datetime
 
 import numpy as np
 import xgboost as xgb
 import os,sys
+import matplotlib.pyplot as plt
 
 
 cpath_current = os.path.dirname(os.path.dirname(__file__))
@@ -21,6 +24,8 @@ from models.trainer import ModelTrainer
 from models.feature_engine import FeatureEngine, FeatureType
 from models.model_manager import ModelManager
 from models.feature_generator import CFeatureGenerator
+from models.auto_trainer import AutoTrainer
+from models.feature_processor import FeatureProcessor
 
 
 class T_SAMPLE_INFO(TypedDict):
@@ -75,11 +80,11 @@ if __name__ == "__main__":
     data_src = DATA_SRC.PICKLE
     lv_list = [KL_TYPE.K_60M]
 
-    config = CChanConfig({
+    my_config = {
         "trigger_step": True,  # 打开开关！
         "bi_strict": True,
         "skip_step": 0,
-        "divergence_rate": float("inf"),
+        "divergence_rate": 999999999,  # 使用一个大数字代替 inf
         "bsp2_follow_1": False,
         "bsp3_follow_1": False,
         "min_zs_cnt": 0,
@@ -88,7 +93,8 @@ if __name__ == "__main__":
         "bs_type": '1,1p',
         "print_warning": True,
         "zs_algo": "normal",
-    })
+    }
+    config = CChanConfig(my_config)
 
     chan = CChan(
         code=code,
@@ -147,6 +153,11 @@ if __name__ == "__main__":
                    if BSP_TYPE.T1 in bsp.type or BSP_TYPE.T1P in bsp.type]  # 只考虑一类买卖点
     plot_marker, feature_meta, X, y = feature_engine.save_features(bsp_dict, bsp_academy)
     
+    # 初始化特征处理器
+    processor = FeatureProcessor()
+    processor.fit(X, list(feature_meta.keys()))
+    X_processed = processor.transform(X)
+    
     # 打印标签分布
     print("\n标签分布:")
     print(f"总样本数: {len(y)}")
@@ -156,15 +167,15 @@ if __name__ == "__main__":
     
     # 检查特征值分布
     print("\n特征值检查:")
-    print("特征最大值:", X.max(axis=0))
-    print("特征最小值:", X.min(axis=0))
-    print("特征均值:", X.mean(axis=0))
-    print("特征标准差:", X.std(axis=0))
+    print("特征最大值:", X_processed.max(axis=0))
+    print("特征最小值:", X_processed.min(axis=0))
+    print("特征均值:", X_processed.mean(axis=0))
+    print("特征标准差:", X_processed.std(axis=0))
     
     # 检查是否有无效特征
     invalid_features = []
     for i, feat_name in enumerate(feature_meta.keys()):
-        if np.all(X[:, i] == 0) or np.all(np.isnan(X[:, i])) or np.all(np.isinf(X[:, i])):
+        if np.all(X_processed[:, i] == 0) or np.all(np.isnan(X_processed[:, i])) or np.all(np.isinf(X_processed[:, i])):
             invalid_features.append(feat_name)
     if invalid_features:
         print("\n发现无效特征:")
@@ -173,115 +184,41 @@ if __name__ == "__main__":
     
     # 画图检查label是否正确
     # plot(chan, plot_marker)
-    
-    # 训练模型
-    trainer = ModelTrainer()
-    
-    # 特征选择
-    selected_features = trainer.select_features(X, y, list(feature_meta.keys()))
-    
-    # 参数调优
-    best_params = trainer.tune_parameters(X, y)
-    trainer.params.update(best_params)
-    
-    # 交叉验证
-    cv_metrics = trainer.cross_validate(X, y)
-    print("\n交叉验证结果:")
-    for metric, value in cv_metrics.items():
-        print(f"{metric}: {value:.4f}")
-    
-    # 训练最终模型
-    metrics = trainer.train(X, y, selected_features)
-    
-    # 绘制评估图
-    trainer.plot_model_evaluation(X, y)
-    
-    # 输出训练和验证集评估指标
-    print("\n训练集评估指标:")
-    for name, value in metrics['train'].items():
-        # 添加中文说明
-        metric_name = {
-            'auc': 'AUC值(auc)',
-            'accuracy': '准确率(accuracy)',
-            'precision': '精确率(precision)',
-            'recall': '召回率(recall)',
-            'f1': 'F1值(f1)',
-            'fpr': '假正例率(fpr)',
-            'mcc': '马修斯相关系数(mcc)'
-        }.get(name, name)
-        print(f"{metric_name}: {value:.4f}")
-        
-    print("\n验证集评估指标:")
-    for name, value in metrics['val'].items():
-        metric_name = {
-            'auc': 'AUC值(auc)',
-            'accuracy': '准确率(accuracy)',
-            'precision': '精确率(precision)',
-            'recall': '召回率(recall)',
-            'f1': 'F1值(f1)',
-            'fpr': '假正例率(fpr)',
-            'mcc': '马修斯相关系数(mcc)'
-        }.get(name, name)
-        print(f"{metric_name}: {value:.4f}")
-    
-    # 绘制训练曲线
-    trainer.plot_training_curves()
-    
-    # 绘制特征重要性图
-    trainer.plot_feature_importance()
-    
-    # 初始化模型管理器
+    # 保存模型
     model_manager = ModelManager()
+    model_dir = os.path.join(model_manager.base_dir, 
+                            datetime.now().strftime('%Y%m%d_%H%M%S'))
+    # 初始化训练器
+    time_limit = 100  # 1小时训练时间限制
+    trainer = AutoTrainer(time_limit=time_limit)
+    trainer.train(X_processed, y, list(feature_meta.keys()),model_dir)  # 使用处理后的特征
     
-    # 创建新的模型目录
-    model_dir = model_manager.create_model_dir()
+    print("训练完成, 开始获取模型分析")
+    # 获取模型分析
+    insights = trainer.get_model_insights()
+    print("模型分析完成")
     
-    # 先保存到当前目录
-    if hasattr(trainer.model, '_Booster'):
-        trainer.model._Booster.save_model("model.json")
-    else:
-        trainer.model.save_model("model.json")
-        
-    # 复制文件到模型目录
+    # 创建训练信息
+    train_info = {
+        'train_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'time_limit': time_limit,
+        'data_info': {
+            'code': code,
+            'begin_time': begin_time,
+            'end_time': end_time,
+            'kl_type': str(lv_list[0])
+        },
+        'chan_config': my_config,  # 直接使用原始配置字典
+        'performance': insights['leaderboard'],
+        'fit_summary': insights['fit_summary']
+    }
+    
+    
     model_manager.save_model(
         model_dir=model_dir,
-        model_path="model.json",
-        meta_path="feature.meta",
-        processor_path="feature_processor.joblib",
-        chan_config={
-            "trigger_step": True,
-            "bi_strict": True,
-            "skip_step": 0,
-            "divergence_rate": float("inf"),
-            "bsp2_follow_1": False,
-            "bsp3_follow_1": False,
-            "min_zs_cnt": 0,
-            "bs1_peak": False,
-            "macd_algo": "peak",
-            "bs_type": '1,1p',
-            "print_warning": True,
-            "zs_algo": "normal",
-        },
-        train_info={
-            "code": code,
-            "kl_type": str(lv_list[0]),
-            "begin_time": begin_time,
-            "end_time": end_time,
-            "data_src": str(data_src)
-        },
-        metrics=metrics  # 添加评估指标
+        feature_meta=feature_meta,
+        processor=processor,  # 传入FeatureProcessor实例
+        train_info=train_info,
     )
     
     print(f"\n模型已保存到: {model_dir}")
-    
-    # 分析特征
-    trainer.analyze_features(X, y, list(feature_meta.keys()))
-    
-    # 计算预测置信区间
-    mean_pred, conf_interval = trainer.predict_with_confidence(X)
-    print("\n预测置信区间示例:")
-    for i in range(min(5, len(mean_pred))):
-        print(f"样本 {i}: {mean_pred[i]:.4f} ± {conf_interval[i]:.4f}")
-    
-    # # 暂时注释掉SHAP分析，需要安装shap包才能使用
-    # trainer.explain_predictions(X, list(feature_meta.keys()))
