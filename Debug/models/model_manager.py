@@ -52,14 +52,29 @@ class ModelManager:
             processor: 特征处理器
         """
         # 加载模型
-        model = TabularPredictor.load(os.path.join(model_dir, "model"))
-        
+        autogluon_path = os.path.join(model_dir, "autogluon")
+        if not os.path.exists(autogluon_path):
+            raise FileNotFoundError(f"AutoGluon 模型目录不存在: {autogluon_path}")
+            
+        try:
+            model = TabularPredictor.load(autogluon_path)
+        except Exception as e:
+            raise Exception(f"加载 AutoGluon 模型失败: {str(e)}")
+            
         # 加载特征映射
-        with open(os.path.join(model_dir, "feature_meta.json"), "r") as f:
+        feature_meta_path = os.path.join(model_dir, "feature_meta.json")
+        if not os.path.exists(feature_meta_path):
+            raise FileNotFoundError(f"特征映射文件不存在: {feature_meta_path}")
+            
+        with open(feature_meta_path, "r") as f:
             feature_meta = json.load(f)
             
         # 加载特征处理器
-        processor = FeatureProcessor.load(os.path.join(model_dir, "feature_processor.joblib"))
+        processor_path = os.path.join(model_dir, "feature_processor.joblib")
+        if not os.path.exists(processor_path):
+            raise FileNotFoundError(f"特征处理器文件不存在: {processor_path}")
+            
+        processor = FeatureProcessor.load(processor_path)
         
         return model, feature_meta, processor
         
@@ -68,11 +83,18 @@ class ModelManager:
         if not os.path.exists(self.base_dir):
             return None
             
+        # 过滤掉 __pycache__ 和其他不需要的目录
         model_dirs = [d for d in os.listdir(self.base_dir) 
-                     if os.path.isdir(os.path.join(self.base_dir, d))]
+                     if os.path.isdir(os.path.join(self.base_dir, d)) and 
+                     not d.startswith('__') and  # 过滤掉 __pycache__ 等
+                     not d.startswith('.')]      # 过滤掉 .git 等隐藏目录
         
         if not model_dirs:
+            print(f"在 {self.base_dir} 中未找到有效的模型目录")
             return None
             
+        # 按创建时间排序，获取最新的目录
         latest_dir = max(model_dirs, key=lambda x: os.path.getctime(os.path.join(self.base_dir, x)))
-        return os.path.join(self.base_dir, latest_dir) 
+        full_path = os.path.join(self.base_dir, latest_dir)
+        print(f"找到最新模型目录: {full_path}")
+        return full_path 

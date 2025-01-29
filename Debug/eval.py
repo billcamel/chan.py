@@ -1,8 +1,12 @@
 import json
-from typing import Dict, TypedDict
+from typing import Dict, List, TypedDict
 import os,sys
 import numpy as np
 import xgboost as xgb
+import pandas as pd
+from datetime import datetime
+from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, f1_score, matthews_corrcoef
+
 
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
@@ -20,36 +24,106 @@ from models import FeatureProcessor
 from models.trainer import ModelEvaluator
 from models.feature_engine import FeatureEngine
 from models.model_manager import ModelManager
+from models.auto_trainer import AutoTrainer
 
 from Debug.models.trade_analyzer import TradeAnalyzer
+from Debug.models.feature_generator import CFeatureGenerator
 
 
-def predict_bsp(model: xgb.Booster, features: Dict[str, float], feature_meta: Dict[str, int], processor: FeatureProcessor) -> float:
-    """预测买卖点的概率
+def predict_bsp(model, features: Dict, feature_meta: Dict, processor) -> float:
+    """预测买卖点的概率"""
+    # 将特征字典转换为有序的特征列表
+    feature_list = []
+    missing_features = []
+    for feat_name in feature_meta.keys():
+        if feat_name not in features:
+            missing_features.append(feat_name)
+            feature_list.append(0)  # 使用默认值
+        else:
+            feature_list.append(features[feat_name])
     
-    Args:
-        model: 训练好的XGBoost模型
-        features: 特征字典
-        feature_meta: 特征映射信息
-        processor: 特征处理器
-        
-    Returns:
-        float: 预测的概率值
-    """
-    # 特征归一化
-    scaled_features = processor.transform_dict(features)
-    
-    # 构建特征向量
-    X = np.zeros(len(feature_meta))
-    for feat_name, value in scaled_features.items():
-        if feat_name in feature_meta:
-            X[feature_meta[feat_name]] = value
+    # 只在第一次遇到缺失特征时打印警告
+    if missing_features and not hasattr(predict_bsp, 'warned_features'):
+        print(f"警告: 以下特征在预测时不存在: {missing_features}")
+        print("这可能会影响模型的预测效果")
+        predict_bsp.warned_features = True
             
-    # 转换为DMatrix
-    dtest = xgb.DMatrix(X.reshape(1, -1))
+    # 转换为numpy数组并处理
+    X = np.array([feature_list])
+    X_processed = processor.transform(X)
+    
+    # 转换为DataFrame
+    df = pd.DataFrame(X_processed, columns=list(feature_meta.keys()))
+    
+    # 使用模型预测
+    y_pred_proba = model.predict_proba(df)
+    
+    # 检查预测结果的格式并返回正类的概率
+    if isinstance(y_pred_proba, pd.DataFrame):
+        return y_pred_proba.iloc[0, 1]
+    elif isinstance(y_pred_proba, np.ndarray):
+        return y_pred_proba[0, 1]
+    else:
+        raise ValueError(f"Unexpected prediction format: {type(y_pred_proba)}")
+
+def evaluate_metrics(y_true: np.ndarray, y_pred_proba: np.ndarray) -> Dict:
+    """计算各项评估指标"""
+    y_pred = (y_pred_proba[:, 1] >= 0.5).astype(int)
+    
+    metrics = {
+        'auc': roc_auc_score(y_true, y_pred_proba[:, 1]),
+        'accuracy': accuracy_score(y_true, y_pred),
+        'precision': precision_score(y_true, y_pred),
+        'recall': recall_score(y_true, y_pred),
+        'f1': f1_score(y_true, y_pred),
+        'fpr': 1 - recall_score(y_true, y_pred),
+        'mcc': matthews_corrcoef(y_true, y_pred)
+    }
+    return metrics
+
+def load_and_evaluate(model_dir: str, X: np.ndarray, y: np.ndarray, feature_names: List[str]) -> Dict:
+    """加载模型并评估性能"""
+    # 加载模型和相关文件
+    model_manager = ModelManager()
+    model, feature_meta, processor = model_manager.load_model(model_dir)
+    
+    # 加载训练信息
+    with open(os.path.join(model_dir, "train_info.json"), "r") as f:
+        train_info = json.load(f)
+    
+    # 处理特征
+    X_processed = processor.transform(X)
     
     # 预测
-    return model.predict(dtest)[0]
+    test_data = pd.DataFrame(X_processed, columns=feature_names)
+    y_pred_proba = model.predict_proba(test_data)
+    
+    # 计算评估指标
+    metrics = evaluate_metrics(y, y_pred_proba)
+    
+    # 打印评估结果
+    print("\n模型评估结果:")
+    for metric, value in metrics.items():
+        print(f"{metric}值({metric}): {value:.4f}")
+        
+    # 打印模型信息
+    print("\n模型信息:")
+    print(f"训练时间: {train_info['train_time']}")
+    print(f"训练时长限制: {train_info.get('time_limit', 'unknown')}秒")
+    print(f"最佳模型: {train_info['fit_summary'].get('best_model', 'unknown')}")
+    print(f"总训练时长: {train_info['fit_summary'].get('total_time', 'unknown')}秒")
+    
+    # 打印数据信息
+    print("\n数据信息:")
+    print(f"代码: {train_info['data_info']['code']}")
+    print(f"开始时间: {train_info['data_info']['begin_time']}")
+    print(f"结束时间: {train_info['data_info']['end_time']}")
+    print(f"K线类型: {train_info['data_info']['kl_type']}")
+    
+    return {
+        'metrics': metrics,
+        'train_info': train_info
+    }
 
 if __name__ == "__main__":
     """
@@ -60,13 +134,13 @@ if __name__ == "__main__":
     end_time = None
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_5M]
+    lv_list = [KL_TYPE.K_60M]
 
     config = CChanConfig({
         "trigger_step": True,  # 打开开关！
         "bi_strict": True,
         "skip_step": 0,
-        "divergence_rate": float("inf"),
+        "divergence_rate": 999999999,
         "bsp2_follow_1": False,
         "bsp3_follow_1": False,
         "min_zs_cnt": 0,
@@ -111,6 +185,10 @@ if __name__ == "__main__":
     
     # 记录交易结果
     trades = []
+    # 初始化特征生成器实例
+    feature_set = CFeatureGenerator()
+    # 一键添加所有特征
+    feature_set.add_all_features()
     
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
@@ -125,14 +203,16 @@ if __name__ == "__main__":
             continue
 
         # 使用特征引擎计算特征
-        features = feature_engine.get_features(
-            kline_data, 
-            len(kline_data)-1,
-            chan_snapshot  # 传入缠论快照
-        )
+        market_features = {
+            **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
+            **feature_set.generate_features(chan_snapshot)
+        }
+        
+        # 添加缺失的特征
+        market_features['divergence_rate'] = 0  # 或其他合适的默认值
         
         # 预测买卖点的概率
-        prob = predict_bsp(model, features, feature_meta, processor)
+        prob = predict_bsp(model, market_features, feature_meta, processor)
         
         # 记录交易信息
         trade_info = {
@@ -205,5 +285,43 @@ if __name__ == "__main__":
     print(f"总交易次数: {stats['trade_count']}")
     print(f"买入次数: {stats['buy_count']}")
     print(f"卖出次数: {stats['sell_count']}")
+
+    # 获取最新的模型目录
+    model_manager = ModelManager()
+    model_dir = model_manager.get_latest_model_dir()
+    
+    if model_dir is None:
+        print("未找到模型目录")
+        exit(1)
+        
+    print(f"加载模型目录: {model_dir}")
+    
+    try:
+        # 生成测试数据
+        # TODO: 这里需要替换为实际的测试数据生成逻辑
+        X_test = np.array([features for features in feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot) for _ in range(100)])
+        y_test = np.array([1 if bsp.is_buy else 0 for bsp in chan.get_bsp()])
+        feature_names = [f"feature_{i}" for i in range(len(features))]
+        
+        # 评估模型
+        results = load_and_evaluate(model_dir, X_test, y_test, feature_names)
+        
+        # 保存评估结果
+        eval_dir = os.path.join(model_dir, "eval_results")
+        if not os.path.exists(eval_dir):
+            os.makedirs(eval_dir)
+            
+        eval_file = os.path.join(eval_dir, 
+                                f"eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+        with open(eval_file, "w") as f:
+            json.dump(results, f, indent=2)
+            
+        print(f"\n评估结果已保存到: {eval_file}")
+        
+    except Exception as e:
+        print(f"评估过程出错: {str(e)}")
+        # 打印详细的错误堆栈
+        import traceback
+        traceback.print_exc()
 
 
