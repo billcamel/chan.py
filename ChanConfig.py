@@ -5,11 +5,14 @@ from BuySellPoint.BSPointConfig import CBSPointConfig
 from Common.CEnum import TREND_TYPE
 from Common.ChanException import CChanException, ErrCode
 from Common.func_util import _parse_inf
+from Math.ATR import ATR
 from Math.BOLL import BollModel
 from Math.Demark import CDemarkEngine
 from Math.KDJ import KDJ
 from Math.MACD import CMACD
+from Math.MASS import MASS
 from Math.RSI import RSI
+from Math.ROC import ROC
 from Math.TrendModel import CTrendModel
 from Seg.SegConfig import CSegConfig
 from ZS.ZSConfig import CZSConfig
@@ -49,14 +52,20 @@ class CChanConfig:
         self.print_warning = conf.get("print_warning", True)
         self.print_err_time = conf.get("print_err_time", True)
 
-        self.mean_metrics: List[int] = conf.get("mean_metrics", [])
-        self.trend_metrics: List[int] = conf.get("trend_metrics", [])
+        self.mean_metrics: List[int] = conf.get("mean_metrics", [5,20,80])
+        self.trend_metrics: List[int] = conf.get("trend_metrics", [20])
         self.macd_config = conf.get("macd", {"fast": 12, "slow": 26, "signal": 9})
         self.cal_demark = conf.get("cal_demark", False)
-        self.cal_rsi = conf.get("cal_rsi", False)
-        self.cal_kdj = conf.get("cal_kdj", False)
+        self.cal_rsi = conf.get("cal_rsi", True )
+        self.cal_kdj = conf.get("cal_kdj", True)
         self.rsi_cycle = conf.get("rsi_cycle", 14)
         self.kdj_cycle = conf.get("kdj_cycle", 9)
+        self.cal_roc = conf.get("cal_roc", True)
+        self.roc_period = conf.get("roc_period", 9)
+        self.cal_atr = conf.get("cal_atr", True)
+        self.atr_period = conf.get("atr_period", 14)
+        self.cal_mass = conf.get("cal_mass", True)
+        self.mass_period = conf.get("mass_period", 10)
         self.demark_config = conf.get("demark", {
             'demark_len': 9,
             'setup_bias': 4,
@@ -66,14 +75,14 @@ class CChanConfig:
             'setup_cmp2close': True,
             'countdown_cmp2close': True,
         })
-        self.boll_n = conf.get("boll_n", 20)
+        self.boll_n = conf.get("boll_n", [20,50])
 
         self.set_bsp_config(conf)
 
         conf.check()
 
     def GetMetricModel(self):
-        res: List[CMACD | CTrendModel | BollModel | CDemarkEngine | RSI | KDJ] = [
+        res: List[CMACD | CTrendModel | BollModel | CDemarkEngine | RSI | KDJ | ROC | MASS | ATR] = [
             CMACD(
                 fastperiod=self.macd_config['fast'],
                 slowperiod=self.macd_config['slow'],
@@ -85,7 +94,8 @@ class CChanConfig:
         for trend_T in self.trend_metrics:
             res.append(CTrendModel(TREND_TYPE.MAX, trend_T))
             res.append(CTrendModel(TREND_TYPE.MIN, trend_T))
-        res.append(BollModel(self.boll_n))
+        for n in self.boll_n:
+            res.append(BollModel(n))
         if self.cal_demark:
             res.append(CDemarkEngine(
                 demark_len=self.demark_config['demark_len'],
@@ -100,6 +110,12 @@ class CChanConfig:
             res.append(RSI(self.rsi_cycle))
         if self.cal_kdj:
             res.append(KDJ(self.kdj_cycle))
+        if self.cal_roc:
+            res.append(ROC(self.roc_period))
+        if self.cal_atr:
+            res.append(ATR(self.atr_period))
+        if self.cal_mass:
+            res.append(MASS())
         return res
 
     def set_bsp_config(self, conf):

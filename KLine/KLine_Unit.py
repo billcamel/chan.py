@@ -4,10 +4,13 @@ from typing import Dict, Optional
 from Common.CEnum import DATA_FIELD, TRADE_INFO_LST, TREND_TYPE
 from Common.ChanException import CChanException, ErrCode
 from Common.CTime import CTime
+from Math.ATR import ATR
 from Math.BOLL import BOLL_Metric, BollModel
 from Math.Demark import CDemarkEngine, CDemarkIndex
 from Math.KDJ import KDJ
 from Math.MACD import CMACD, CMACD_item
+from Math.MASS import MASS
+from Math.ROC import ROC
 from Math.RSI import RSI
 from Math.TrendModel import CTrendModel
 
@@ -125,13 +128,28 @@ class CKLine_Unit:
                     self.trend[metric_model.type] = {}
                 self.trend[metric_model.type][metric_model.T] = metric_model.add(self.close)
             elif isinstance(metric_model, BollModel):
-                self.boll: BOLL_Metric = metric_model.add(self.close)
+                # 初始化 bolls 字典，如果尚未定义
+                if not hasattr(self, 'bolls'):
+                    self.bolls = {}
+                # 计算并设置布林带指标，并存储在字典中
+                period = metric_model.N
+                self.bolls[period] = metric_model.add(self.close)
+                # 设置 self.boll 为 self.bolls 字典中的第一个元素
+                if self.bolls:
+                    self.boll = next(iter(self.bolls.values()))
             elif isinstance(metric_model, CDemarkEngine):
                 self.demark = metric_model.update(idx=self.idx, close=self.close, high=self.high, low=self.low)
             elif isinstance(metric_model, RSI):
                 self.rsi = metric_model.add(self.close)
             elif isinstance(metric_model, KDJ):
                 self.kdj = metric_model.add(self.high, self.low, self.close)
+            elif isinstance(metric_model, ROC):
+                self.roc = metric_model.add(self.close)
+            elif isinstance(metric_model, ATR):
+                pre_close = self.pre.close if self.pre else self.close
+                self.atr = metric_model.add(self.high, self.low, pre_close)
+            elif isinstance(metric_model, MASS):
+                self.mass = metric_model.add(self.high, self.low)    
 
     def get_parent_klc(self):
         assert self.sup_kl is not None

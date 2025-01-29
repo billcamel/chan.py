@@ -48,7 +48,7 @@ if __name__ == "__main__":
     end_time = None
     # end_time = "2024-01-01"
     data_src_type = DATA_SRC.PICKLE
-    kl_type = KL_TYPE.K_15M
+    kl_type = KL_TYPE.K_5M
     lv_list = [kl_type]
 
     config = CChanConfig({
@@ -153,7 +153,7 @@ if __name__ == "__main__":
         elif cur_lv_chan[-2].fx == FX_TYPE.TOP and not last_bsp.is_buy and is_hold and prob > 0.5:  # 只在高概率时卖出
             sell_price = cur_lv_chan[-1][-1].close
             profit_rate = (sell_price-last_buy_price)/last_buy_price*100
-            print(f'{cur_lv_chan[-1][-1].time}:sell price = {sell_price}, profit rate = {profit_rate:.2f}%, prob = {prob:.2%}')
+            print(f'{cur_lv_chan[-1][-1].time}:sell price = {sell_price}, prob = {prob:.2%}, profit rate = {profit_rate:.2f}%')
             is_hold = False
             trades.append({
                 'time': cur_lv_chan[-1][-1].time,

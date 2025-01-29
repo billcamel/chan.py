@@ -5,6 +5,7 @@ import numpy as np
 import xgboost as xgb
 import os,sys
 
+
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
@@ -19,6 +20,7 @@ from Plot.PlotlyDriver import CPlotlyDriver
 from models.trainer import ModelTrainer
 from models.feature_engine import FeatureEngine, FeatureType
 from models.model_manager import ModelManager
+from models.feature_generator import CFeatureGenerator
 
 
 class T_SAMPLE_INFO(TypedDict):
@@ -68,10 +70,10 @@ if __name__ == "__main__":
     """
     code = "BTC/USDT"
     begin_time = "2020-01-01"
-    end_time = "2021-01-01"
+    end_time = "2022-01-01"
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_60M, KL_TYPE.K_15M]
+    lv_list = [KL_TYPE.K_60M]
 
     config = CChanConfig({
         "trigger_step": True,  # 打开开关！
@@ -103,7 +105,11 @@ if __name__ == "__main__":
 
     bsp_dict: Dict[int, T_SAMPLE_INFO] = {}  # 存储策略产出的bsp的特征
     kline_data = []  # 存储K线数据用于后续分析
-    
+    # 初始化特征生成器实例
+    feature_set = CFeatureGenerator()
+    # 一键添加所有特征
+    feature_set.add_all_features()
+
     # 跑策略，保存买卖点的特征
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
@@ -124,11 +130,10 @@ if __name__ == "__main__":
                 "open_time": last_klu.time,
             }
             # 使用特征引擎计算特征
-            market_features = feature_engine.get_features(
-                kline_data, 
-                len(kline_data)-1,
-                chan_snapshot  # 传入缠论快照
-            )
+            market_features = {
+                **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
+                **feature_set.generate_features(chan_snapshot)
+            }
             # if len(kline_data) > 100:
             #     print(market_features)
             #     break

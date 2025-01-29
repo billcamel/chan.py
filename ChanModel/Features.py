@@ -16,3 +16,14 @@ class CFeatures:
             self.__features.update(inp1)
         else:
             self.__features.update({inp1: inp2})
+    def __str__(self):
+        # 返回特征字典的字符串表示
+        return str(self.__features)
+    
+    def to_dict(self):
+        """
+        Converts the features to a dictionary format.
+        
+        :return: A dictionary containing all features.
+        """
+        return dict(self.__features)

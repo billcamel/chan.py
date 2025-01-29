@@ -60,7 +60,7 @@ if __name__ == "__main__":
     end_time = None
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_15M]
+    lv_list = [KL_TYPE.K_5M]
 
     config = CChanConfig({
         "trigger_step": True,  # 打开开关！

@@ -252,9 +252,15 @@ class CChan:
                 except StopIteration:
                     break
 
-            if parent_klu and kline_unit.time > parent_klu.time:
+            # time.ts是unix时间戳，单位是秒，这里判断两个时间戳差值是否大于60秒
+            if parent_klu and (kline_unit.time.ts - parent_klu.time.ts) > 60*45:
                 self.klu_cache[lv_idx] = kline_unit
                 break
+            # if parent_klu:
+            #     print(f"{cur_lv} kline_unit.time: {kline_unit.time}, parent_klu.time: {parent_klu.time}")
+            # else:
+            #     print(f"{cur_lv} kline_unit.time: {kline_unit.time}, parent_klu.time: None")
+
             kline_unit.set_pre_klu(pre_klu)
             pre_klu = kline_unit
             self.add_new_kl(cur_lv, kline_unit)
