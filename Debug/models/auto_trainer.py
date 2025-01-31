@@ -27,7 +27,6 @@ class AutoTrainer:
             problem_type='binary',
             path=model_dir+"/autogluon"  # 设置保存路径
         )
-        
         # 训练模型
         self.predictor.fit(
             train_data,
@@ -50,7 +49,7 @@ class AutoTrainer:
             },
             ag_args_fit={  # 添加训练配置
                 'num_gpus': 0,  # 不使用GPU
-                'num_cpus': 4,  # 限制CPU使用数量
+                'num_cpus': 8,  # 限制CPU使用数量
             }
         )
         
@@ -67,6 +66,8 @@ class AutoTrainer:
         #     self.feature_importance = self.predictor.feature_importance(data=train_data)
         # except:
         #     print("无法计算特征重要性")
+        print("eval训练数据:")
+        self.predictor.evaluate(train_data,display=True)
             
         return self.predictor
         
