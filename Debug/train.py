@@ -140,48 +140,56 @@ if __name__ == "__main__":
                 **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
                 **feature_set.generate_features(chan_snapshot)
             }
-            # if len(kline_data) > 100:
+            # if len(kline_data) > 300:
             #     print(market_features)
             #     break
 
             bsp_dict[last_bsp.klu.idx]['feature'].add_feat(market_features)
 
     print(market_features)
+    # print(market_features.keys())
 
     # 生成特征数据
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp(0) 
                    if BSP_TYPE.T1 in bsp.type or BSP_TYPE.T1P in bsp.type]  # 只考虑一类买卖点
     plot_marker, feature_meta, X, y = feature_engine.save_features(bsp_dict, bsp_academy)
+
+    print("市场特征中的特征:", market_features.keys())
+    print("特征元数据中的特征:", feature_meta.keys())
+    print("差异特征:", feature_meta.keys() - market_features.keys())
     
     # 初始化特征处理器
     processor = FeatureProcessor()
     processor.fit(X, list(feature_meta.keys()))
     X_processed = processor.transform(X)
+    # X_processed = X
     
     # 打印标签分布
     print("\n标签分布:")
+    print(f"特征维度: {X_processed.shape}")
     print(f"总样本数: {len(y)}")
     print(f"正样本数: {sum(y)}")
     print(f"负样本数: {len(y) - sum(y)}")
     print(f"正样本比例: {sum(y)/len(y):.2%}")
     
-    # 检查特征值分布
-    print("\n特征值检查:")
-    print("特征最大值:", X_processed.max(axis=0))
-    print("特征最小值:", X_processed.min(axis=0))
-    print("特征均值:", X_processed.mean(axis=0))
-    print("特征标准差:", X_processed.std(axis=0))
-    
     # 检查是否有无效特征
     invalid_features = []
-    for i, feat_name in enumerate(feature_meta.keys()):
-        if np.all(X_processed[:, i] == 0) or np.all(np.isnan(X_processed[:, i])) or np.all(np.isinf(X_processed[:, i])):
-            invalid_features.append(feat_name)
+    for feat_name, feat_idx in feature_meta.items():
+        feat_values = X_processed[:, feat_idx]
+        # 检查特征是否全为0、NaN或无穷大
+        if np.all(feat_values == 0):
+            invalid_features.append((feat_name, "全为0"))
+        elif np.all(np.isnan(feat_values)):
+            invalid_features.append((feat_name, "全为NaN"))
+        elif np.all(np.isinf(feat_values)):
+            invalid_features.append((feat_name, "全为无穷大"))
+        elif np.all(np.abs(feat_values) > 1e10):
+            invalid_features.append((feat_name, "数值过大"))
+            
     if invalid_features:
         print("\n发现无效特征:")
-        for feat in invalid_features:
-            print(f"- {feat}")
-    
+        for feat_name, reason in invalid_features:
+            print(f"- {feat_name}: {reason}")
     # 画图检查label是否正确
     # plot(chan, plot_marker)
     # 保存模型

@@ -474,15 +474,13 @@ class ModelTrainer:
 
 class ModelEvaluator:
     """模型评估器"""
-    def __init__(self, model_file: str, threshold: float = 0.6):
+    def __init__(self,threshold: float = 0.6):
         """初始化评估器
         
         Args:
             model_file: 模型文件路径
             threshold: 预测概率阈值
         """
-        self.model = xgb.Booster()
-        self.model.load_model(model_file)
         self.threshold = threshold
         
     def predict(self, X: np.ndarray) -> np.ndarray:

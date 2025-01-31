@@ -10,14 +10,14 @@ class CFeatureGenerator:
 
     def register_factor(category):
         def decorator(func):
-            print(f"注册因子：{func.__name__}，类别：{category}")
+            # print(f"注册因子：{func.__name__}，类别：{category}")
             feature_registry[category].append(func)
             return func
         return decorator
 
     def register_feature(category):
         def decorator(func):
-            print(f"注册特征：{func.__name__}，类别：{category}")
+            # print(f"注册特征：{func.__name__}，类别：{category}")
             feature_registry_ext[category].append(func)
             return func
         return decorator
@@ -137,10 +137,10 @@ class CFeatureGenerator:
 
             # 将特征函数添加到 feature_funcs 列表中
             for feature_func in features:
-                print(f"添加特征: {feature_func.__name__}，类别: {category}")
+                # print(f"添加特征: {feature_func.__name__}，类别: {category}")
                 # 这里使用一个函数来绑定当前的 feature_func
                 self.add_feature(self._bind_feature(feature_func))
-        print(f"添加特征数: {len(self.feature_funcs)}")
+        print(f"CFeatureGenerator 添加特征数: {len(self.feature_funcs)}")
 
     def _bind_feature(self, feature_func):
         """为特征函数绑定 self 参数，确保每个函数独立运行"""
@@ -171,21 +171,18 @@ class CFeatureGenerator:
         return wick_rate 
 
     @register_factor("kline")
-
     def range_rate(self, range1, range2):
         """计算两K线的波动率比"""
         range_rate = range1 / range2 if range2 != 0 else None
         return range_rate
 
     @register_factor("kline")
-
     def range(self, high, low):
         """计算两K线的波动率比"""
         range = abs(high - low) / low
         return range
 
     @register_factor("pattern")
-
     def ma1_color(self, pre_klu, last_klu, length):
         """计算MA1颜色变化"""
         if self.pre_klu is None or self.last_klu is None:
@@ -198,7 +195,6 @@ class CFeatureGenerator:
         return ma1_color
 
     @register_factor("pattern")
-
     def ma2_color(self, pre_klu, last_klu, length):
         """计算MA2颜色变化"""
         if self.pre_klu is None or self.last_klu is None:
@@ -211,7 +207,6 @@ class CFeatureGenerator:
         return ma2_color
 
     @register_factor("pattern")
-
     def ma3_color(self, pre_klu, last_klu, length):
         """计算MA3颜色变化"""
         if self.pre_klu is None or self.last_klu is None:
@@ -224,13 +219,11 @@ class CFeatureGenerator:
         return ma3_color
     
     @register_factor("indicator")
-
     def rsi(self, klu):
         """计算RSI指标"""
         return klu.rsi
     
     @register_factor("indicator")
-
     def neutral_rsi(self, klu):
         """计算中性RSI指标"""
         rsi = klu.rsi
@@ -238,7 +231,6 @@ class CFeatureGenerator:
         return neutral_rsi
 
     @register_factor("indicator")
-
     def cci(self, klu, length):
         """计算CCI指标"""
         ma_dic = self.ma_dic(klu)
@@ -249,7 +241,6 @@ class CFeatureGenerator:
         return cci
 
     @register_factor("indicator")
-
     def boll(self, klu, length):
         """计算Bollinger带"""
         boll_up = klu.bolls[length].UP
@@ -258,7 +249,6 @@ class CFeatureGenerator:
         return (boll_up, boll_mid, boll_down)
 
     @register_factor("indicator")
-
     def bbb(self, klu, length):
         """计算Bollinger带宽比"""
         boll_up = klu.bolls[length].UP
@@ -266,7 +256,6 @@ class CFeatureGenerator:
         return (klu.close - boll_down) / (boll_up - boll_down)
 
     @register_factor("indicator")
-
     def normalize_bbw(self, klu, length):
         """计算标准化的BBW"""
         boll_up = klu.bolls[length].UP
@@ -277,7 +266,6 @@ class CFeatureGenerator:
         return normalize_bbw
 
     @register_factor("indicator")
-
     def normalize_bbt(self, klu, length1, length2):
         """计算标准化的BBT"""
         boll1_up = klu.bolls[length1].UP
@@ -292,7 +280,6 @@ class CFeatureGenerator:
         return normalize_bbt
 
     @register_factor("indicator")
-
     def ma_ratio(self, klu):
         """计算MA比率"""
         if klu is None or klu.boll is None:
@@ -304,7 +291,6 @@ class CFeatureGenerator:
         return ma_ratio
 
     @register_factor("indicator")
-
     def roc(self, re_klu_lst, n):
         """计算给定KLU列表的ROC（Rate of Change）特征，返回所有ROC值的列表"""
         roc_lst = []
@@ -323,7 +309,6 @@ class CFeatureGenerator:
         return roc_lst
 
     @register_factor("indicator")
-
     def adx(self, re_klu_lst, adx_length=14, di_length=14):
         """
         计算 ADX 指标，并返回每个周期的 ADX 值序列。
@@ -628,7 +613,6 @@ class CFeatureGenerator:
     # 缠论因子
     #================================
     @register_factor("chan")
-
     def fx_factor(self, cur_lv_chan):
         """打印倒数三根 KLC 数据并计算 fx_factor"""
         # 打印函数被调用的信息
@@ -662,7 +646,6 @@ class CFeatureGenerator:
         return fx_factor
 
     @register_factor("chan")
-
     def chan_bsp_type(self, bsp):
         bsp_type = bsp.type[0].value
         bsp_type_mapping = {
@@ -673,7 +656,6 @@ class CFeatureGenerator:
         return bsp_type
 
     @register_factor("chan")
-
     def chan_is_BiAndSeg_bsp(self, bsp, seg_bsp):
         """最后一个分段买卖点的类型特征"""
         seg_bsp_time = seg_bsp.klu.time
@@ -694,7 +676,6 @@ class CFeatureGenerator:
     #     return bi_volume_rate
 
     @register_factor("chan")
-
     def chan_bsp_isB1(self, bsp):
         """当前买卖点的类型特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -704,7 +685,6 @@ class CFeatureGenerator:
         return bsp_isB1
 
     @register_factor("chan")
-
     def chan_bsp_isB1p(self, bsp):
         """当前买卖点的类型特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -714,7 +694,6 @@ class CFeatureGenerator:
         return bsp_isB1p
 
     @register_factor("chan")
-
     def chan_bsp_isS1(self, bsp):
         """当前买卖点的类型特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -724,7 +703,6 @@ class CFeatureGenerator:
         return bsp_isS1
 
     @register_factor("chan")
-
     def chan_bsp_isS1p(self, bsp):
         """当前买卖点的类型特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -734,7 +712,6 @@ class CFeatureGenerator:
         return  bsp_isS1p
 
     @register_factor("chan")
-
     def chan_bsp_isB2(self, bsp):
         """当前买卖点的B2特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -744,7 +721,6 @@ class CFeatureGenerator:
         return bsp_isB2
 
     @register_factor("chan")
-
     def chan_bsp_isS2(self, bsp):
         """当前买卖点的S2特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -754,7 +730,6 @@ class CFeatureGenerator:
         return bsp_isS2
 
     @register_factor("chan")
-
     def chan_bsp_isB2s(self, bsp):
         """当前买卖点的B2s特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -764,7 +739,6 @@ class CFeatureGenerator:
         return bsp_isB2s
 
     @register_factor("chan")
-
     def chan_bsp_isS2s(self, bsp):
         """当前买卖点的S2s特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -774,7 +748,6 @@ class CFeatureGenerator:
         return bsp_isS2s
 
     @register_factor("chan")
-
     def chan_bsp_isB3a(self, bsp):
         """判断买卖点是否为类型B3a的特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -784,7 +757,6 @@ class CFeatureGenerator:
         return bsp_isB3a
 
     @register_factor("chan")
-
     def chan_bsp_isS3a(self, bsp):
         """判断买卖点是否为类型S3a的特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -794,7 +766,6 @@ class CFeatureGenerator:
         return bsp_isS3a
 
     @register_factor("chan")
-
     def chan_bsp_isB3b(self, bsp):
         """判断买卖点是否为类型B3b的特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型
@@ -804,7 +775,6 @@ class CFeatureGenerator:
         return bsp_isB3b
 
     @register_factor("chan")
-
     def chan_bsp_isS3b(self, bsp):
         """判断买卖点是否为类型S3b的特征"""
         bsp_type = bsp.type[0].value  # 获取当前买卖点的类型

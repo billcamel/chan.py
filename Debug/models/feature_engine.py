@@ -7,6 +7,7 @@ import talib
 from enum import Enum, auto
 import json
 
+from Chan import CChan
 from Common.CEnum import BI_DIR, BSP_TYPE, FX_TYPE, MACD_ALGO
 from .feature_processor import FeatureProcessor
 
@@ -26,7 +27,7 @@ class FeatureEngine:
         Args:
             enabled_types: 启用的特征类型列表
         """
-        self.enabled_types = [FeatureType.TECHNICAL, FeatureType.CHAN]
+        self.enabled_types = [ FeatureType.TECHNICAL, FeatureType.CHAN]
         # 固定参数
         self.normalize_window = 100  # 归一化窗口
         
@@ -48,9 +49,9 @@ class FeatureEngine:
             'volume': [kl.trade_info.metric.get('volume', 0) for kl in kline_data]
         })
         
-        # 检查数据长度
-        if len(df) < self.normalize_window:
-            return pd.DataFrame()
+        # # 检查数据长度
+        # if len(df) < self.normalize_window:
+        #     return pd.DataFrame()
             
         # 计算所有特征
         features = {}
@@ -81,17 +82,16 @@ class FeatureEngine:
         Returns:
             特征字典
         """
+        features = {}
         if idx < self.normalize_window:
-            return {}
+            return features
             
         # 使用transform获取基础特征
         df = self.transform(kline_data)
-        if df.empty:
-            return {}
-            
-        # 获取基础特征（transform返回的是单行DataFrame）
-        features = df.iloc[0].to_dict()
-        features = {k: v for k, v in features.items() if pd.notna(v)}
+        if not df.empty:
+            # 获取基础特征（transform返回的是单行DataFrame）
+            features = df.iloc[0].to_dict()
+            features = {k: v for k, v in features.items() if pd.notna(v)}
         
         # 添加缠论特征
         if FeatureType.CHAN in self.enabled_types and chan_snapshot:
@@ -373,12 +373,12 @@ class FeatureEngine:
         # 收集所有特征名
         feature_meta = {}
         cur_feature_idx = 0
+        stop=False
         for _, feature_info in bsp_dict.items():
             for feature_name, _ in feature_info['feature'].items():
                 if feature_name not in feature_meta:
                     feature_meta[feature_name] = cur_feature_idx
                     cur_feature_idx += 1
-        
         # 准备特征矩阵和标签
         n_samples = len(bsp_dict)
         n_features = len(feature_meta)
@@ -393,12 +393,19 @@ class FeatureEngine:
             
             # 填充特征
             features = feature_info['feature'].items()
+            # 记录废弃的特征数
+            discarded_features = 0
             for feature_name, value in features:
-                if not isinstance(value, (int, float)):
+                if isinstance(value, bool):
+                    value = 1 if value else 0
+                elif not isinstance(value, (int, float)):
+                    discarded_features += 1
                     continue
                 if feature_name in feature_meta:
                     feat_idx = feature_meta[feature_name]
                     X[i, feat_idx] = float(value)
+            if discarded_features > 0:
+                print(f"废弃了 {discarded_features} 个非数值特征")
             
             # 记录标记点
             plot_marker[feature_info["open_time"].to_str()] = (
@@ -407,31 +414,21 @@ class FeatureEngine:
             )
         
         # 打印一些调试信息
-        print(f"\n特征维度: {X.shape}")
-        print(f"特征名列表: {list(feature_meta.keys())}")
-        print(f"样本数量: {n_samples}")
-        print(f"正样本数量: {np.sum(y)}")
-        print(f"正样本比例: {np.mean(y):.2%}")
+        # print(f"\n特征维度: {X.shape}")
+        # print(f"特征名列表: {list(feature_meta.keys())}")
+        # print(f"样本数量: {n_samples}")
+        # print(f"正样本数量: {np.sum(y)}")
+        # print(f"正样本比例: {np.mean(y):.2%}")
         
         # 检查特征矩阵是否有效
         if np.any(np.isnan(X)):
             print("警告: 特征矩阵包含NaN值")
         if np.any(np.isinf(X)):
             print("警告: 特征矩阵包含Inf值")
-        
-        # # 特征归一化
-        # processor = FeatureProcessor()
-        # processor.fit(X, list(feature_meta.keys()))
-        # X = processor.transform(X)
-        
-        # # 保存特征处理器和特征meta
-        # processor.save("feature_processor.joblib")
-        # with open("feature.meta", "w") as fid:
-        #     json.dump(feature_meta, fid, indent=2)
             
         return plot_marker, feature_meta, X, y
 
-    def _get_chan_features(self, chan_snapshot: Any) -> Dict[str, float]:
+    def _get_chan_features(self, chan_snapshot: CChan) -> Dict[str, float]:
         """计算缠论特征
         
         Args:
@@ -446,6 +443,7 @@ class FeatureEngine:
             # 获取买卖点列表
             bsp_list = chan_snapshot.get_bsp(0)
             if not bsp_list or len(bsp_list) < 4:
+                print("买卖点太少，不计算缠论特征：", len(bsp_list))
                 features.update({
                     'bsp_d1': 0,
                     'bsp_d2': 0,
@@ -508,6 +506,7 @@ class FeatureEngine:
                 features['fx_high'] = cur_lv_chan[-2].high
                 features['fx_low'] = cur_lv_chan[-2].low
             else:
+                # print("没有分型")
                 features['fx_type'] = 0
                 features['fx_high'] = 0
                 features['fx_low'] = 0
@@ -531,6 +530,7 @@ class FeatureEngine:
                 # features['bi_macd_amount_avg'] = last_bi.cal_macd_metric(MACD_ALGO.AMOUNT_AVG, False)
                 # features['bi_macd_turnrate_avg'] = last_bi.cal_macd_metric(MACD_ALGO.TURNRATE_AVG, False)
             else:
+                # print("没有笔")
                 features['bi_direction'] = 0
                 features['bi_length'] = 0
                 features['bi_amp'] = 0

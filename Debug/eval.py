@@ -176,6 +176,7 @@ if __name__ == "__main__":
         train_info = json.load(f)
     print(f"使用模型: {model_dir}")
     print(f"训练时间: {train_info['train_time']}")
+    print(f"训练数据: {train_info['data_info']}")
     
     # 初始化特征引擎
     feature_engine = FeatureEngine()
@@ -207,9 +208,7 @@ if __name__ == "__main__":
             **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
             **feature_set.generate_features(chan_snapshot)
         }
-        
-        # 添加缺失的特征
-        market_features['divergence_rate'] = 0  # 或其他合适的默认值
+    
         
         # 预测买卖点的概率
         prob = predict_bsp(model, market_features, feature_meta, processor)
@@ -234,7 +233,7 @@ if __name__ == "__main__":
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
     
     # 评估结果
-    evaluator = ModelEvaluator("model.json", threshold=0.6)
+    evaluator = ModelEvaluator(threshold=0.6)
     stats = evaluator.evaluate_trades(trades, bsp_academy)
     
     # 输出评估结果
@@ -286,42 +285,42 @@ if __name__ == "__main__":
     print(f"买入次数: {stats['buy_count']}")
     print(f"卖出次数: {stats['sell_count']}")
 
-    # 获取最新的模型目录
-    model_manager = ModelManager()
-    model_dir = model_manager.get_latest_model_dir()
+    # # 获取最新的模型目录
+    # model_manager = ModelManager()
+    # model_dir = model_manager.get_latest_model_dir()
     
-    if model_dir is None:
-        print("未找到模型目录")
-        exit(1)
+    # if model_dir is None:
+    #     print("未找到模型目录")
+    #     exit(1)
         
-    print(f"加载模型目录: {model_dir}")
+    # print(f"加载模型目录: {model_dir}")
     
-    try:
-        # 生成测试数据
-        # TODO: 这里需要替换为实际的测试数据生成逻辑
-        X_test = np.array([features for features in feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot) for _ in range(100)])
-        y_test = np.array([1 if bsp.is_buy else 0 for bsp in chan.get_bsp()])
-        feature_names = [f"feature_{i}" for i in range(len(features))]
+    # try:
+    #     # 生成测试数据
+    #     # TODO: 这里需要替换为实际的测试数据生成逻辑
+    #     X_test = np.array([features for features in feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot) for _ in range(100)])
+    #     y_test = np.array([1 if bsp.is_buy else 0 for bsp in chan.get_bsp()])
+    #     feature_names = [f"feature_{i}" for i in range(len(features))]
         
-        # 评估模型
-        results = load_and_evaluate(model_dir, X_test, y_test, feature_names)
+    #     # 评估模型
+    #     results = load_and_evaluate(model_dir, X_test, y_test, feature_names)
         
-        # 保存评估结果
-        eval_dir = os.path.join(model_dir, "eval_results")
-        if not os.path.exists(eval_dir):
-            os.makedirs(eval_dir)
+    #     # 保存评估结果
+    #     eval_dir = os.path.join(model_dir, "eval_results")
+    #     if not os.path.exists(eval_dir):
+    #         os.makedirs(eval_dir)
             
-        eval_file = os.path.join(eval_dir, 
-                                f"eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
-        with open(eval_file, "w") as f:
-            json.dump(results, f, indent=2)
+    #     eval_file = os.path.join(eval_dir, 
+    #                             f"eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    #     with open(eval_file, "w") as f:
+    #         json.dump(results, f, indent=2)
             
-        print(f"\n评估结果已保存到: {eval_file}")
+    #     print(f"\n评估结果已保存到: {eval_file}")
         
-    except Exception as e:
-        print(f"评估过程出错: {str(e)}")
-        # 打印详细的错误堆栈
-        import traceback
-        traceback.print_exc()
+    # except Exception as e:
+    #     print(f"评估过程出错: {str(e)}")
+    #     # 打印详细的错误堆栈
+    #     import traceback
+    #     traceback.print_exc()
 
 
