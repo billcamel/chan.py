@@ -1,4 +1,6 @@
+import sys
 from autogluon.tabular import TabularPredictor
+from autogluon.features.generators import AutoMLPipelineFeatureGenerator
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional
@@ -19,7 +21,12 @@ class AutoTrainer:
         # 转换为DataFrame
         train_data = pd.DataFrame(X, columns=feature_names)
         train_data['label'] = y
-        
+        auto_ml_pipeline_feature_generator = AutoMLPipelineFeatureGenerator()
+        train_data = auto_ml_pipeline_feature_generator.fit_transform(X=train_data, y=y)
+        print(f"auto特征维度: {train_data.shape}")
+        print(f"auto特征: {train_data.head()}")
+        print(f"auto特征名: {train_data.columns.tolist()}")
+
         # AutoGluon训练
         self.predictor = TabularPredictor(
             label='label',
@@ -39,7 +46,7 @@ class AutoTrainer:
                     {'num_boost_round': 100},
                     {'num_boost_round': 200},
                 ],
-                'CAT': {},  # CatBoost
+                # 'CAT': {},  # CatBoost
                 'RF': [  # Random Forest
                     {'n_estimators': 100},
                     {'n_estimators': 200},
@@ -66,8 +73,9 @@ class AutoTrainer:
         #     self.feature_importance = self.predictor.feature_importance(data=train_data)
         # except:
         #     print("无法计算特征重要性")
-        print("eval训练数据:")
-        self.predictor.evaluate(train_data,display=True)
+        if sys.platform != "darwin":  # 如果不是 macOS
+            print("eval训练数据:")
+            self.predictor.evaluate(train_data,display=True)
             
         return self.predictor
         

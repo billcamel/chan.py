@@ -115,7 +115,7 @@ if __name__ == "__main__":
     feature_set = CFeatureGenerator()
     # 一键添加所有特征
     feature_set.add_all_features()
-
+    print("开始生成训练数据")
     # 跑策略，保存买卖点的特征
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     model_dir = os.path.join(model_manager.base_dir, 
                             datetime.now().strftime('%Y%m%d_%H%M%S'))
     # 初始化训练器
-    time_limit = 100  # 1小时训练时间限制
+    time_limit = 1000  # 1小时训练时间限制
     trainer = AutoTrainer(time_limit=time_limit)
     trainer.train(X_processed, y, list(feature_meta.keys()),model_dir)  # 使用处理后的特征
     
