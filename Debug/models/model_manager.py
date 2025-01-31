@@ -57,6 +57,7 @@ class ModelManager:
             raise FileNotFoundError(f"AutoGluon 模型目录不存在: {autogluon_path}")
             
         try:
+            # 这里会加载 AutoGluon 的最佳模型
             model = TabularPredictor.load(autogluon_path)
         except Exception as e:
             raise Exception(f"加载 AutoGluon 模型失败: {str(e)}")

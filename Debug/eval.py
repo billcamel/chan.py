@@ -50,6 +50,8 @@ def predict_bsp(model, features: Dict, feature_meta: Dict, processor) -> float:
             
     # 转换为numpy数组并处理
     X = np.array([feature_list])
+    
+    # 使用特征处理器进行处理
     X_processed = processor.transform(X)
     
     # 转换为DataFrame
@@ -108,10 +110,8 @@ def load_and_evaluate(model_dir: str, X: np.ndarray, y: np.ndarray, feature_name
         
     # 打印模型信息
     print("\n模型信息:")
-    print(f"训练时间: {train_info['train_time']}")
-    print(f"训练时长限制: {train_info.get('time_limit', 'unknown')}秒")
-    print(f"最佳模型: {train_info['fit_summary'].get('best_model', 'unknown')}")
-    print(f"总训练时长: {train_info['fit_summary'].get('total_time', 'unknown')}秒")
+    print(model.get_model_best())  # 获取最佳模型信息
+    print(model.leaderboard())     # 显示所有模型的性能排名
     
     # 打印数据信息
     print("\n数据信息:")

@@ -162,7 +162,6 @@ if __name__ == "__main__":
     processor = FeatureProcessor()
     processor.fit(X, list(feature_meta.keys()))
     X_processed = processor.transform(X)
-    # X_processed = X
     
     # 打印标签分布
     print("\n标签分布:")
