@@ -3,6 +3,7 @@ import numpy as np
 from typing import List, Dict
 from datetime import datetime
 import matplotlib as mpl
+import pandas as pd
 
 # 设置中文字体
 try:
@@ -129,72 +130,74 @@ class TradeAnalyzer:
         return stats
     
     def plot_equity_curve(self):
-        """绘制资金曲线"""
-        import matplotlib.pyplot as plt
-        
-        # 计算资金曲线
-        capital = self.initial_capital
-        equity_data = []  # 存储时间和资金数据
-        trade_points = []
-        last_buy_price = None
-        
-        for trade in sorted(self.trade_history, key=lambda x: x['time']):
-            # if trade['prob'] <= 0.6:
-            #     continue
-                
-            if trade['is_buy']:
-                # 买入时记录点位和价格
-                last_buy_price = trade['price']
-                trade_points.append({
-                    'time': trade['time'].to_str(),
-                    'capital': capital,
-                    'type': 'buy'
-                })
-            else:
-                # 卖出时更新资金
-                if last_buy_price is not None:  # 确保有买入价格
-                    profit = (trade['price'] - last_buy_price) / last_buy_price
-                    capital *= (1 + profit)
-                    equity_data.append({
-                        'time': trade['time'].to_str(),
-                        'capital': capital
-                    })
-                    trade_points.append({
-                        'time': trade['time'].to_str(),
-                        'capital': capital,
-                        'type': 'sell'
-                    })
-                    last_buy_price = None  # 重置买入价格
-        
-        if not equity_data:  # 如果没有交易数据，直接返回
-            print("没有足够的交易数据来绘制资金曲线")
+        """绘制权益曲线"""
+        if not self.trade_history:
+            print("没有交易记录")
             return
-            
-        # 绘制资金曲线
+        
+        # 准备数据
+        data = [{
+            'time': trade['time'],
+            'price': trade['price'],
+            'prob': trade['prob'],
+            'is_buy': trade['is_buy']
+        } for trade in self.trade_history]
+        
+        # 转换为DataFrame
+        df = pd.DataFrame(data)
+        
+        # 尝试不同的时间格式
+        try:
+            # 先尝试标准格式
+            df['time'] = pd.to_datetime(df['time'])
+        except ValueError:
+            try:
+                # 尝试只有日期的格式
+                df['time'] = pd.to_datetime(df['time'], format='%Y/%m/%d')
+            except ValueError:
+                # 使用混合格式
+                df['time'] = pd.to_datetime(df['time'], format='mixed')
+        
+        df = df.sort_values('time')
+        
+        # 计算累计收益
+        initial_price = df['price'].iloc[0]
+        df['returns'] = (df['price'] - initial_price) / initial_price
+        
+        # 绘制权益曲线
         plt.figure(figsize=(12, 6))
-        
-        # 绘制连续的资金曲线
-        times = [d['time'] for d in equity_data]
-        capitals = [d['capital'] for d in equity_data]
-        plt.plot(times, capitals, 'b-', label='资金曲线')
-        
-        # # 标记买卖点
-        # for point in trade_points:
-        #     if point['type'] == 'buy':
-        #         plt.plot(point['time'], point['capital'], 'g^', markersize=8, 
-        #                 label='买入点' if '买入点' not in plt.gca().get_legend_handles_labels()[1] else "")
-        #     else:
-        #         plt.plot(point['time'], point['capital'], 'rv', markersize=8,
-        #                 label='卖出点' if '卖出点' not in plt.gca().get_legend_handles_labels()[1] else "")
-        
-        plt.title('交易资金曲线')
+        plt.plot(df['time'], df['returns'], label='价格走势', color='blue')
+        plt.title('交易分析')
         plt.xlabel('时间')
-        plt.ylabel('资金')
+        plt.ylabel('收益率')
         plt.grid(True)
+        
+        # 添加买卖点标记
+        buys = df[df['is_buy']]
+        sells = df[~df['is_buy']]
+        
+        plt.scatter(buys['time'], buys['returns'], 
+                   color='red', marker='^', s=100, label='买入信号')
+        plt.scatter(sells['time'], sells['returns'], 
+                   color='green', marker='v', s=100, label='卖出信号')
+        
         plt.legend()
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.show()
+        
+        # 打印交易统计
+        print("\n交易统计:")
+        print(f"总交易次数: {len(df)}")
+        print(f"买入次数: {len(buys)}")
+        print(f"卖出次数: {len(sells)}")
+        print(f"最终收益率: {df['returns'].iloc[-1]:.2%}")
+        
+        # 计算最大回撤
+        cummax = df['returns'].cummax()
+        drawdown = cummax - df['returns']
+        max_drawdown = drawdown.max()
+        print(f"最大回撤: {max_drawdown:.2%}")
         
     def _calculate_win_rate(self) -> float:
         """计算胜率"""

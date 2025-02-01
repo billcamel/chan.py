@@ -30,7 +30,7 @@ from Debug.models.trade_analyzer import TradeAnalyzer
 from Debug.models.feature_generator import CFeatureGenerator
 
 
-def predict_bsp(model, features: Dict, feature_meta: Dict, processor) -> float:
+def predict_bsp(model, features: Dict, feature_meta: Dict, processor: FeatureProcessor) -> float:
     """预测买卖点的概率"""
     # 将特征字典转换为有序的特征列表
     feature_list = []
@@ -59,6 +59,7 @@ def predict_bsp(model, features: Dict, feature_meta: Dict, processor) -> float:
     # print(df.head())
     # 使用模型预测
     y_pred_proba = model.predict_proba(df)
+    # print(y_pred_proba)
     
     # 检查预测结果的格式并返回正类的概率
     if isinstance(y_pred_proba, pd.DataFrame):
@@ -130,11 +131,11 @@ if __name__ == "__main__":
     本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
     code = "BTC/USDT"
-    begin_time = "2024-01-01"
-    end_time = None
-    # end_time = "2024-01-01"
+    begin_time = "2020-01-01"
+    # end_time = None
+    end_time = "2021-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_60M]
+    lv_list = [KL_TYPE.K_15M]
 
     config = CChanConfig({
         "trigger_step": True,  # 打开开关！
@@ -234,7 +235,7 @@ if __name__ == "__main__":
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
     
     # 评估结果
-    evaluator = ModelEvaluator(threshold=0.6)
+    evaluator = ModelEvaluator(threshold=0.4)
     stats = evaluator.evaluate_trades(trades, bsp_academy)
     
     # 输出评估结果
