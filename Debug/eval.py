@@ -131,9 +131,9 @@ if __name__ == "__main__":
     本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
     code = "BTC/USDT"
-    begin_time = "2020-01-01"
-    # end_time = None
-    end_time = "2021-01-01"
+    begin_time = "2024-01-01"
+    end_time = None
+    # end_time = "2022-01-01"
     data_src = DATA_SRC.PICKLE
     lv_list = [KL_TYPE.K_15M]
 
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
     
     # 评估结果
-    evaluator = ModelEvaluator(threshold=0.4)
+    evaluator = ModelEvaluator(threshold=0.5)
     stats = evaluator.evaluate_trades(trades, bsp_academy)
     
     # 输出评估结果

@@ -174,8 +174,8 @@ class FeatureEngine:
                 # RSI变化率
                 features[f'rsi_{period}_slope'] = (rsi.iloc[-1] - rsi.iloc[-2]) / rsi.iloc[-2]
                 # RSI超买超卖
-                features[f'rsi_{period}_overbought'] = 1 if rsi.iloc[-1] > 70 else 0
-                features[f'rsi_{period}_oversold'] = 1 if rsi.iloc[-1] < 30 else 0
+                # features[f'rsi_{period}_overbought'] = 1 if rsi.iloc[-1] > 70 else 0
+                # features[f'rsi_{period}_oversold'] = 1 if rsi.iloc[-1] < 30 else 0
             
             # 随机指标族
             slowk, slowd = talib.STOCH(df.high[-2*20:], df.low[-2*20:], df.close[-2*20:])

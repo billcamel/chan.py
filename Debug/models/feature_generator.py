@@ -968,64 +968,64 @@ class CFeatureGenerator:
         return {"pre_seg_bsp_isS1p": pre_seg_bsp_isS1p}
     
     # 2类特征
-    # last_bsp 特征
-    @register_feature("last")
-    def last_bsp_isB2_feature(self):
-        """当前买卖点的B2特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isB2 = self.chan_bsp_isB2(self.last_bsp)
-        return {"bsp_isB2": bsp_isB2}
-    @register_feature("last")
-    def last_bsp_isS2_feature(self):
-        """当前买卖点的S2特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isS2 = self.chan_bsp_isS2(self.last_bsp)
-        return {"bsp_isS2": bsp_isS2}
-    @register_feature("last")
-    def last_bsp_isB2s_feature(self):
-        """当前买卖点的B2s特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isB2s = self.chan_bsp_isB2s(self.last_bsp)
-        return {"bsp_isB2s": bsp_isB2s}
-    @register_feature("last")
-    def last_bsp_isS2s_feature(self):
-        """当前买卖点的S2s特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isS2s = self.chan_bsp_isS2s(self.last_bsp)
-        return {"bsp_isS2s": bsp_isS2s}
-    # pre_bsp 特征
-    @register_feature("pre")
-    def pre_bsp_isB2_feature(self):
-        """前一个买卖点的B2特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isB2 = self.chan_bsp_isB2(self.pre_bsp)
-        return {"bsp_isB2": bsp_isB2}
-    @register_feature("pre")
-    def pre_bsp_isS2_feature(self):
-        """前一个买卖点的S2特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isS2 = self.chan_bsp_isS2(self.pre_bsp)
-        return {"bsp_isS2": bsp_isS2}
-    @register_feature("pre")
-    def pre_bsp_isB2s_feature(self):
-        """前一个买卖点的B2s特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isB2s = self.chan_bsp_isB2s(self.pre_bsp)
-        return {"bsp_isB2s": bsp_isB2s}
-    @register_feature("pre")
-    def pre_bsp_isS2s_feature(self):
-        """前一个买卖点的S2s特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isS2s = self.chan_bsp_isS2s(self.pre_bsp)
-        return {"bsp_isS2s": bsp_isS2s}
+    # # last_bsp 特征
+    # @register_feature("last")
+    # def last_bsp_isB2_feature(self):
+    #     """当前买卖点的B2特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isB2 = self.chan_bsp_isB2(self.last_bsp)
+    #     return {"bsp_isB2": bsp_isB2}
+    # @register_feature("last")
+    # def last_bsp_isS2_feature(self):
+    #     """当前买卖点的S2特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isS2 = self.chan_bsp_isS2(self.last_bsp)
+    #     return {"bsp_isS2": bsp_isS2}
+    # @register_feature("last")
+    # def last_bsp_isB2s_feature(self):
+    #     """当前买卖点的B2s特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isB2s = self.chan_bsp_isB2s(self.last_bsp)
+    #     return {"bsp_isB2s": bsp_isB2s}
+    # @register_feature("last")
+    # def last_bsp_isS2s_feature(self):
+    #     """当前买卖点的S2s特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isS2s = self.chan_bsp_isS2s(self.last_bsp)
+    #     return {"bsp_isS2s": bsp_isS2s}
+    # # pre_bsp 特征
+    # @register_feature("pre")
+    # def pre_bsp_isB2_feature(self):
+    #     """前一个买卖点的B2特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isB2 = self.chan_bsp_isB2(self.pre_bsp)
+    #     return {"bsp_isB2": bsp_isB2}
+    # @register_feature("pre")
+    # def pre_bsp_isS2_feature(self):
+    #     """前一个买卖点的S2特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isS2 = self.chan_bsp_isS2(self.pre_bsp)
+    #     return {"bsp_isS2": bsp_isS2}
+    # @register_feature("pre")
+    # def pre_bsp_isB2s_feature(self):
+    #     """前一个买卖点的B2s特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isB2s = self.chan_bsp_isB2s(self.pre_bsp)
+    #     return {"bsp_isB2s": bsp_isB2s}
+    # @register_feature("pre")
+    # def pre_bsp_isS2s_feature(self):
+    #     """前一个买卖点的S2s特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isS2s = self.chan_bsp_isS2s(self.pre_bsp)
+    #     return {"bsp_isS2s": bsp_isS2s}
     # last_seg_bsp 特征
     @register_feature("last")
     def last_seg_bsp_isB2_feature(self):
@@ -1085,65 +1085,65 @@ class CFeatureGenerator:
         bsp_isS2s = self.chan_bsp_isS2s(self.pre_seg_bsp)
         return {"pre_seg_bsp_isS2s": bsp_isS2s}
 
-    # 3类特征
-    # last_bsp 特征
-    @register_feature("last")
-    def last_bsp_isB3a_feature(self):
-        """当前买卖点的B3a特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isB3a = self.chan_bsp_isB3a(self.last_bsp)
-        return {"bsp_isB3a": bsp_isB3a}
-    @register_feature("last")
-    def last_bsp_isS3a_feature(self):
-        """当前买卖点的S3a特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isS3a = self.chan_bsp_isS3a(self.last_bsp)
-        return {"bsp_isS3a": bsp_isS3a}
-    @register_feature("last")
-    def last_bsp_isB3b_feature(self):
-        """当前买卖点的B3b特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isB3b = self.chan_bsp_isB3b(self.last_bsp)
-        return {"bsp_isB3b": bsp_isB3b}
-    @register_feature("last")
-    def last_bsp_isS3b_feature(self):
-        """当前买卖点的S3b特征"""
-        if not self.last_bsp:
-            return None
-        bsp_isS3b = self.chan_bsp_isS3b(self.last_bsp)
-        return {"bsp_isS3b": bsp_isS3b}
-    # pre_bsp 特征
-    @register_feature("pre")
-    def pre_bsp_isB3a_feature(self):
-        """前一个买卖点的B3a特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isB3a = self.chan_bsp_isB3a(self.pre_bsp)
-        return {"pre_bsp_isB3a": bsp_isB3a}
-    @register_feature("pre")
-    def pre_bsp_isS3a_feature(self):
-        """前一个买卖点的S3a特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isS3a = self.chan_bsp_isS3a(self.pre_bsp)
-        return {"pre_bsp_isS3a": bsp_isS3a}
-    @register_feature("pre")
-    def pre_bsp_isB3b_feature(self):
-        """前一个买卖点的B3b特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isB3b = self.chan_bsp_isB3b(self.pre_bsp)
-        return {"pre_bsp_isB3b": bsp_isB3b}
-    @register_feature("pre")
-    def pre_bsp_isS3b_feature(self):
-        """前一个买卖点的S3b特征"""
-        if not self.pre_bsp:
-            return None
-        bsp_isS3b = self.chan_bsp_isS3b(self.pre_bsp)
-        return {"pre_bsp_isS3b": bsp_isS3b}
+    # # 3类特征
+    # # last_bsp 特征
+    # @register_feature("last")
+    # def last_bsp_isB3a_feature(self):
+    #     """当前买卖点的B3a特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isB3a = self.chan_bsp_isB3a(self.last_bsp)
+    #     return {"bsp_isB3a": bsp_isB3a}
+    # @register_feature("last")
+    # def last_bsp_isS3a_feature(self):
+    #     """当前买卖点的S3a特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isS3a = self.chan_bsp_isS3a(self.last_bsp)
+    #     return {"bsp_isS3a": bsp_isS3a}
+    # @register_feature("last")
+    # def last_bsp_isB3b_feature(self):
+    #     """当前买卖点的B3b特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isB3b = self.chan_bsp_isB3b(self.last_bsp)
+    #     return {"bsp_isB3b": bsp_isB3b}
+    # @register_feature("last")
+    # def last_bsp_isS3b_feature(self):
+    #     """当前买卖点的S3b特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_isS3b = self.chan_bsp_isS3b(self.last_bsp)
+    #     return {"bsp_isS3b": bsp_isS3b}
+    # # pre_bsp 特征
+    # @register_feature("pre")
+    # def pre_bsp_isB3a_feature(self):
+    #     """前一个买卖点的B3a特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isB3a = self.chan_bsp_isB3a(self.pre_bsp)
+    #     return {"pre_bsp_isB3a": bsp_isB3a}
+    # @register_feature("pre")
+    # def pre_bsp_isS3a_feature(self):
+    #     """前一个买卖点的S3a特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isS3a = self.chan_bsp_isS3a(self.pre_bsp)
+    #     return {"pre_bsp_isS3a": bsp_isS3a}
+    # @register_feature("pre")
+    # def pre_bsp_isB3b_feature(self):
+    #     """前一个买卖点的B3b特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isB3b = self.chan_bsp_isB3b(self.pre_bsp)
+    #     return {"pre_bsp_isB3b": bsp_isB3b}
+    # @register_feature("pre")
+    # def pre_bsp_isS3b_feature(self):
+    #     """前一个买卖点的S3b特征"""
+    #     if not self.pre_bsp:
+    #         return None
+    #     bsp_isS3b = self.chan_bsp_isS3b(self.pre_bsp)
+    #     return {"pre_bsp_isS3b": bsp_isS3b}
     # last_seg_bsp 特征
     @register_feature("last")
     def last_seg_bsp_isB3a_feature(self):
@@ -1296,77 +1296,77 @@ class CFeatureGenerator:
         pre_seg_bsp_BuyOrSell = 1 if is_buy else -1
         return {"pre_seg_bsp_BuyOrSell": pre_seg_bsp_BuyOrSell}
 
-    # 待删除特征
-    @register_feature("chan")
-    def last_bsp_is1t_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is1t = bsp_type == "1" or bsp_type == "1p"
-        return {"bsp_is1t": bsp_is1t}
-    @register_feature("chan")
-    def last_bsp_is2t_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is2t = bsp_type == "2" or bsp_type == "2s"
-        return {"bsp_is2t": bsp_is2t}
-    @register_feature("chan")
-    def last_bsp_is3t_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is3t = bsp_type == "3a" or bsp_type == "3b"
-        return {"bsp_is3t": bsp_is3t}
-    @register_feature("chan")
-    def last_bsp_is1_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is1 = bsp_type == "1"
-        return {"bsp_is1": bsp_is1}
-    @register_feature("chan")
-    def last_bsp_is2_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is2 = bsp_type == "2"
-        return {"bsp_is2": bsp_is2}
-    @register_feature("chan")
-    def last_bsp_is1p_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is1p = bsp_type == "1p"
-        return {"bsp_is1p": bsp_is1p}
-    @register_feature("chan")
-    def last_bsp_is2s_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is2s = bsp_type == "2s"
-        return {"bsp_is2s": bsp_is2s}
-    @register_feature("chan")
-    def last_bsp_is3a_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is3a = bsp_type == "3a"
-        return {"bsp_is3a": bsp_is3a}
-    @register_feature("chan")
-    def last_bsp_is3b_feature(self):
-        """当前买卖点的类型特征"""
-        if not self.last_bsp:
-            return None
-        bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
-        bsp_is3b = bsp_type == "3b"
-        return {"bsp_is3b": bsp_is3b}
+    # # 待删除特征
+    # @register_feature("chan")
+    # def last_bsp_is1t_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is1t = bsp_type == "1" or bsp_type == "1p"
+    #     return {"bsp_is1t": bsp_is1t}
+    # @register_feature("chan")
+    # def last_bsp_is2t_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is2t = bsp_type == "2" or bsp_type == "2s"
+    #     return {"bsp_is2t": bsp_is2t}
+    # @register_feature("chan")
+    # def last_bsp_is3t_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is3t = bsp_type == "3a" or bsp_type == "3b"
+    #     return {"bsp_is3t": bsp_is3t}
+    # @register_feature("chan")
+    # def last_bsp_is1_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is1 = bsp_type == "1"
+    #     return {"bsp_is1": bsp_is1}
+    # @register_feature("chan")
+    # def last_bsp_is2_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is2 = bsp_type == "2"
+    #     return {"bsp_is2": bsp_is2}
+    # @register_feature("chan")
+    # def last_bsp_is1p_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is1p = bsp_type == "1p"
+    #     return {"bsp_is1p": bsp_is1p}
+    # @register_feature("chan")
+    # def last_bsp_is2s_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is2s = bsp_type == "2s"
+    #     return {"bsp_is2s": bsp_is2s}
+    # @register_feature("chan")
+    # def last_bsp_is3a_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is3a = bsp_type == "3a"
+    #     return {"bsp_is3a": bsp_is3a}
+    # @register_feature("chan")
+    # def last_bsp_is3b_feature(self):
+    #     """当前买卖点的类型特征"""
+    #     if not self.last_bsp:
+    #         return None
+    #     bsp_type = self.last_bsp.type[0].value  # 获取当前买卖点的类型
+    #     bsp_is3b = bsp_type == "3b"
+    #     return {"bsp_is3b": bsp_is3b}
     

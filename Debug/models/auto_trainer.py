@@ -42,15 +42,9 @@ class AutoTrainer:
             num_bag_folds=5,
             num_stack_levels=2,
             hyperparameters={  # 添加模型配置
-                'GBM': [  # LightGBM
-                    {'num_boost_round': 100},
-                    {'num_boost_round': 200},
-                ],
-                # 'CAT': {},  # CatBoost
-                'RF': [  # Random Forest
-                    {'n_estimators': 100},
-                    {'n_estimators': 200},
-                ],
+                'GBM': {},  # LightGBM
+                'CAT': {},  # CatBoost
+                'RF': {}, # Random Forest
                 'XT': {},  # Extra Trees
                 'XGB': {},  # XGBoost
             },
