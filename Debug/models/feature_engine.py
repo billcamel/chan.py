@@ -27,7 +27,7 @@ class FeatureEngine:
         Args:
             enabled_types: 启用的特征类型列表
         """
-        self.enabled_types = [ FeatureType.TECHNICAL, FeatureType.CHAN]
+        self.enabled_types = [ FeatureType.TECHNICAL]
         # 固定参数
         self.normalize_window = 60  # 归一化窗口
         

@@ -17,3 +17,5 @@ Debug/AutogluonModels/*
 *.pkl
 *.ubj
 version.txt
+Debug/feature_data/*
+
