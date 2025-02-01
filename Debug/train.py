@@ -78,7 +78,7 @@ if __name__ == "__main__":
     end_time = "2022-01-01"
     # end_time = "2024-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_60M]
+    lv_list = [KL_TYPE.K_15M]
 
     my_config = {
         "trigger_step": True,  # 打开开关！
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     model_dir = os.path.join(model_manager.base_dir, 
                             datetime.now().strftime('%Y%m%d_%H%M%S'))
     # 初始化训练器
-    time_limit = 1000  # 1小时训练时间限制
+    time_limit = 3600  # 1小时训练时间限制
     trainer = AutoTrainer(time_limit=time_limit)
     trainer.train(X_processed, y, list(feature_meta.keys()),model_dir)  # 使用处理后的特征
     

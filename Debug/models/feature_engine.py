@@ -29,7 +29,7 @@ class FeatureEngine:
         """
         self.enabled_types = [ FeatureType.TECHNICAL, FeatureType.CHAN]
         # 固定参数
-        self.normalize_window = 100  # 归一化窗口
+        self.normalize_window = 60  # 归一化窗口
         
     def transform(self, kline_data: List[Any]) -> pd.DataFrame:
         """转换K线数据为特征DataFrame
@@ -43,11 +43,15 @@ class FeatureEngine:
         # 基础数据准备
         df = pd.DataFrame({
             'open': [kl.open for kl in kline_data],
-            'high': [kl.high for kl in kline_data],
+            'high': [kl.high for kl in kline_data], 
             'low': [kl.low for kl in kline_data],
             'close': [kl.close for kl in kline_data],
             'volume': [kl.trade_info.metric.get('volume', 0) for kl in kline_data]
         })
+        df.open = self._normalize_series(df.open)
+        df.close = self._normalize_series(df.close)
+        df.high = self._normalize_series(df.high)
+        df.low = self._normalize_series(df.low)
         
         # # 检查数据长度
         # if len(df) < self.normalize_window:
@@ -83,8 +87,8 @@ class FeatureEngine:
             特征字典
         """
         features = {}
-        if idx < self.normalize_window:
-            return features
+        # if idx < self.normalize_window:
+        #     return features
             
         # 使用transform获取基础特征
         df = self.transform(kline_data)

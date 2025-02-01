@@ -21,11 +21,11 @@ class AutoTrainer:
         # 转换为DataFrame
         train_data = pd.DataFrame(X, columns=feature_names)
         train_data['label'] = y
-        auto_ml_pipeline_feature_generator = AutoMLPipelineFeatureGenerator()
-        train_data = auto_ml_pipeline_feature_generator.fit_transform(X=train_data, y=y)
-        print(f"auto特征维度: {train_data.shape}")
-        print(f"auto特征: {train_data.head()}")
-        print(f"auto特征名: {train_data.columns.tolist()}")
+        # auto_ml_pipeline_feature_generator = AutoMLPipelineFeatureGenerator()
+        # train_data = auto_ml_pipeline_feature_generator.fit_transform(X=train_data, y=y)
+        # print(f"auto特征维度: {train_data.shape}")
+        # print(f"auto特征: {train_data.head()}")
+        # print(f"auto特征名: {train_data.columns.tolist()}")
 
         # AutoGluon训练
         self.predictor = TabularPredictor(
