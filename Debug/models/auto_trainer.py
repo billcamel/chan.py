@@ -39,8 +39,9 @@ class AutoTrainer:
             train_data,
             time_limit=self.time_limit,
             presets='best_quality',
-            num_bag_folds=5,
-            num_stack_levels=2,
+            auto_stack=True,
+            # num_bag_folds=5,
+            # num_stack_levels=2,
             hyperparameters={  # 添加模型配置
                 'GBM': {},  # LightGBM
                 'CAT': {},  # CatBoost
