@@ -15,7 +15,7 @@ sys.path.append(cpath+"/chan.py")
 
 from Chan import CChan
 from ChanConfig import CChanConfig
-from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE
+from Common.CEnum import AUTYPE, DATA_SRC, KL_TYPE,BSP_TYPE
 from Common.CTime import CTime
 
 # 修改导入路径
@@ -56,7 +56,7 @@ def predict_bsp(model, features: Dict, feature_meta: Dict, processor) -> float:
     
     # 转换为DataFrame
     df = pd.DataFrame(X_processed, columns=list(feature_meta.keys()))
-    
+    # print(df.head())
     # 使用模型预测
     y_pred_proba = model.predict_proba(df)
     
@@ -194,40 +194,41 @@ if __name__ == "__main__":
     for chan_snapshot in chan.step_load():
         last_klu = chan_snapshot[0][-1][-1]
         kline_data.append(last_klu)
-        bsp_list = chan_snapshot.get_bsp()
+        bsp_list = chan_snapshot.get_bsp(0)
         if not bsp_list:
             continue
         last_bsp = bsp_list[-1]
-
-        cur_lv_chan = chan_snapshot[0]
-        if last_bsp.klu.idx in treated_bsp_idx or cur_lv_chan[-2].idx != last_bsp.klu.klc.idx:
+        if BSP_TYPE.T1 not in last_bsp.type and BSP_TYPE.T1P not in last_bsp.type:
             continue
 
-        # 使用特征引擎计算特征
-        market_features = {
-            **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
-            **feature_set.generate_features(chan_snapshot)
-        }
-    
-        
-        # 预测买卖点的概率
-        prob = predict_bsp(model, market_features, feature_meta, processor)
-        
-        # 记录交易信息
-        trade_info = {
-            'time': last_bsp.klu.time.to_str(),
-            'is_buy': last_bsp.is_buy,
-            'prob': prob,
-            'price': last_klu.close,
-            'idx': last_bsp.klu.idx
-        }
-        trades.append(trade_info)
-        
-        # 打印交易信息
-        trade_type = "买入" if last_bsp.is_buy else "卖出"
-        print(f"{trade_info['time']}: {trade_type} 信号, 预测概率={prob:.2%}, 价格={trade_info['price']:.2f}")
-        
-        treated_bsp_idx.add(last_bsp.klu.idx)
+        cur_lv_chan = chan_snapshot[0]
+        if last_bsp.klu.idx not in treated_bsp_idx and cur_lv_chan[-2].idx == last_bsp.klu.klc.idx:
+            features = last_bsp.features
+            # 使用特征引擎计算特征
+            market_features = {
+                **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
+                **feature_set.generate_features(chan_snapshot)
+            }
+            features.add_feat(market_features)
+            
+            # 预测买卖点的概率
+            prob = predict_bsp(model, features.to_dict(), feature_meta, processor)
+            
+            # 记录交易信息
+            trade_info = {
+                'time': last_bsp.klu.time.to_str(),
+                'is_buy': last_bsp.is_buy,
+                'prob': prob,
+                'price': last_klu.close,
+                'idx': last_bsp.klu.idx
+            }
+            trades.append(trade_info)
+            
+            # 打印交易信息
+            trade_type = "买入" if last_bsp.is_buy else "卖出"
+            print(f"{trade_info['time']}: {trade_type} 信号, 预测概率={prob:.2%}, 价格={trade_info['price']:.2f}")
+            
+            treated_bsp_idx.add(last_bsp.klu.idx)
     
     # 获取实际买卖点
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
