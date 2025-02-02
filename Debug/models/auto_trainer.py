@@ -34,24 +34,30 @@ class AutoTrainer:
             problem_type='binary',
             path=model_dir+"/autogluon"  # 设置保存路径
         )
+        
+        # 根据平台配置模型
+        hyperparameters = {
+            'GBM': {},  # LightGBM
+            'RF': {},   # Random Forest
+            'XT': {},   # Extra Trees
+            'XGB': {'tree_method': 'hist'},  # XGBoost
+        }
+        
+        # 在非macOS平台上添加CatBoost
+        if sys.platform != "darwin":
+            hyperparameters['CAT'] = {}
+            hyperparameters['NN_TORCH'] = {'num_epochs': 100}
+        
         # 训练模型
         self.predictor.fit(
             train_data,
             time_limit=self.time_limit,
             presets='best_quality',
             auto_stack=True,
-            # num_bag_folds=5,
-            # num_stack_levels=2,
-            hyperparameters={  # 添加模型配置
-                'GBM': {},  # LightGBM
-                'CAT': {},  # CatBoost
-                'RF': {}, # Random Forest
-                'XT': {},  # Extra Trees
-                'XGB': {},  # XGBoost
-            },
-            ag_args_fit={  # 添加训练配置
-                'num_gpus': 0,  # 不使用GPU
-                'num_cpus': 8,  # 限制CPU使用数量
+            hyperparameters=hyperparameters,
+            ag_args_fit={
+                'num_gpus': 0 if sys.platform == "darwin" else 1,  # macOS不使用GPU
+                'num_cpus': 8,
             }
         )
         

@@ -474,14 +474,71 @@ class ModelTrainer:
 
 class ModelEvaluator:
     """模型评估器"""
-    def __init__(self,threshold: float = 0.6):
-        """初始化评估器
+    def __init__(self, threshold: float = 0.5):
+        self.threshold = threshold
+        
+    def find_best_threshold(self, trades: List[Dict], bsp_academy: List[int], 
+                          start: float = 0.1, end: float = 0.9, step: float = 0.05) -> Dict:
+        """寻找最佳决策阈值
         
         Args:
-            model_file: 模型文件路径
-            threshold: 预测概率阈值
+            trades: 交易记录列表
+            bsp_academy: 实际买卖点列表
+            start: 起始阈值
+            end: 结束阈值
+            step: 步长
+            
+        Returns:
+            包含最佳阈值和对应指标的字典
         """
-        self.threshold = threshold
+        best_metrics = {
+            'threshold': self.threshold,  # 使用当前阈值作为默认值
+            'f1': 0,
+            'precision': 0,
+            'recall': 0,
+            'accuracy': 0,
+            'buy_precision': 0,
+            'sell_precision': 0
+        }
+        
+        print("\n寻找最佳阈值...")
+        print("阈值\tF1\t准确率\t召回率\t买入准确率\t卖出准确率")
+        print("-" * 60)
+        
+        # 遍历不同的阈值
+        for threshold in np.arange(start, end + step, step):
+            self.threshold = threshold  # 临时设置阈值
+            stats = self.evaluate_trades(trades, bsp_academy)
+            
+            # 打印当前阈值的指标
+            print(f"{threshold:.2f}\t{stats['f1']:.2%}\t{stats['precision']:.2%}\t"
+                  f"{stats['recall']:.2%}\t{stats['buy_precision']:.2%}\t"
+                  f"{stats['sell_precision']:.2%}")
+            
+            # 更新最佳指标
+            if stats['f1'] > best_metrics['f1']:
+                best_metrics = {
+                    'threshold': threshold,
+                    'f1': stats['f1'],
+                    'precision': stats['precision'],
+                    'recall': stats['recall'],
+                    'accuracy': stats['high_prob_signals'] / stats['total_signals'],
+                    'buy_precision': stats['buy_precision'],
+                    'sell_precision': stats['sell_precision']
+                }
+        
+        # 设置为最佳阈值
+        self.threshold = best_metrics['threshold']
+        
+        print("\n最佳阈值结果:")
+        print(f"阈值: {best_metrics['threshold']:.2f}")
+        print(f"F1分数: {best_metrics['f1']:.2%}")
+        print(f"准确率: {best_metrics['precision']:.2%}")
+        print(f"召回率: {best_metrics['recall']:.2%}")
+        print(f"买入准确率: {best_metrics['buy_precision']:.2%}")
+        print(f"卖出准确率: {best_metrics['sell_precision']:.2%}")
+        
+        return best_metrics
         
     def predict(self, X: np.ndarray) -> np.ndarray:
         """预测概率

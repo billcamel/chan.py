@@ -131,7 +131,7 @@ if __name__ == "__main__":
     本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
     code = "BTC/USDT"
-    begin_time = "2024-07-01"
+    begin_time = "2024-12-01"
     end_time = None
     # end_time = "2022-01-01"
     data_src = DATA_SRC.PICKLE
@@ -178,6 +178,7 @@ if __name__ == "__main__":
     print(f"使用模型: {model_dir}")
     print(f"训练时间: {train_info['train_time']}")
     print(f"训练数据: {train_info['data_info']}")
+    print(f"decision_threshold: {model.decision_threshold}")
     
     # 初始化特征引擎
     feature_engine = FeatureEngine()
@@ -234,12 +235,15 @@ if __name__ == "__main__":
     # 获取实际买卖点
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
     
-    # 评估结果
-    evaluator = ModelEvaluator(threshold=0.5)
+    # 创建评估器并寻找最佳阈值
+    evaluator = ModelEvaluator()
+    best_metrics = evaluator.find_best_threshold(trades, bsp_academy)
+    
+    # 使用最佳阈值的评估结果已经在evaluator中
     stats = evaluator.evaluate_trades(trades, bsp_academy)
     
     # 输出评估结果
-    print("\n交易统计:")
+    print("\n使用最佳阈值的交易统计:")
     print(f"总信号数: {stats['total_signals']}")
     print(f"买入信号: {stats['buy_signals']}")
     print(f"卖出信号: {stats['sell_signals']}")

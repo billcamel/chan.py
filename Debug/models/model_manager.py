@@ -40,7 +40,7 @@ class ModelManager:
         with open(os.path.join(model_dir, "train_info.json"), "w") as f:
             json.dump(train_info, f, indent=2)
             
-    def load_model(self, model_dir: str) -> Tuple[Any, Dict, Any]:
+    def load_model(self, model_dir: str) -> Tuple[TabularPredictor, Dict, FeatureProcessor]:
         """加载模型和相关文件
         
         Args:
