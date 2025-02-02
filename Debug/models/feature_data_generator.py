@@ -74,7 +74,7 @@ class DataGenerator:
                 
                 market_features = {
                     **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
-                    # **feature_set.generate_features(chan_snapshot)
+                    **feature_set.generate_features(chan_snapshot)
                 }
                 bsp_dict[last_bsp.klu.idx]['feature'].add_feat(market_features)
         
