@@ -100,7 +100,37 @@ class FeatureEngine:
         # 添加缠论特征
         if FeatureType.CHAN in self.enabled_types and chan_snapshot:
             features.update(self._get_chan_features(chan_snapshot))
+        
+        # 添加历史K线涨跌状态特征
+        if idx >= 20:
+            # 获取前20根K线的收盘价
+            hist_prices = [k.close for k in kline_data[idx-20:idx]]
+            hist_opens = [k.open for k in kline_data[idx-20:idx]]
             
+            # 计算涨跌状态
+            for i in range(20):
+                # 计算涨跌幅
+                price_change = (hist_prices[i] - hist_opens[i]) / hist_opens[i]
+                features[f'k{i+1}_change'] = price_change
+                
+                # 计算相对前一根K线的涨跌幅
+                if i > 0:
+                    rel_change = (hist_prices[i] - hist_prices[i-1]) / hist_prices[i-1]
+                    features[f'k{i+1}_rel_change'] = rel_change
+                
+                # 添加涨跌状态标记 (1: 上涨, 0: 平, -1: 下跌)
+                features[f'k{i+1}_state'] = (
+                    1 if price_change > 0.0001 else  # 考虑一个小的阈值避免浮点数精度问题
+                    -1 if price_change < -0.0001 else 
+                    0
+                )
+        else:
+            # 如果历史数据不足，填充默认值
+            for i in range(20):
+                features[f'k{i+1}_change'] = 0
+                features[f'k{i+1}_rel_change'] = 0 if i > 0 else None
+                features[f'k{i+1}_state'] = 0
+        
         return features
     
     def _get_technical_features(self, df: pd.DataFrame) -> Dict[str, float]:
