@@ -15,9 +15,9 @@ if __name__ == "__main__":
     # 配置参数
     code = "BTC/USDT"
     begin_time = "2020-01-01"
-    end_time = "2022-01-01"
+    end_time = "2021-01-01"
     data_src = DATA_SRC.PICKLE
-    lv_list = [KL_TYPE.K_5M]
+    lv_list = [KL_TYPE.K_60M]
 
     # 缠论配置
     chan_config = {
