@@ -44,6 +44,27 @@ class KLineImageEngine:
             return np.full_like(prices, 0.5)
         return (prices - min_price) / (max_price - min_price)
     
+    def _calculate_ma(self, kline_data: List[Any], start_idx: int, period: int) -> np.ndarray:
+        """计算移动平均线
+        
+        Args:
+            kline_data: K线数据列表
+            start_idx: 起始K线索引
+            period: 均线周期
+            
+        Returns:
+            移动平均线数据
+        """
+        if start_idx < period:
+            return None
+        
+        prices = np.array([
+            k.close for k in kline_data[start_idx-period:start_idx+self.window_size]
+        ])
+        
+        ma = np.convolve(prices, np.ones(period)/period, mode='valid')
+        return ma[-self.window_size:]
+
     def _draw_kline(self, 
                     image: Image.Image,
                     kline_data: List[Any],
@@ -63,18 +84,35 @@ class KLineImageEngine:
             for k in kline_data[start_idx:start_idx+self.window_size]
         ])
         
+        # 计算MA10和MA20
+        ma10 = self._calculate_ma(kline_data, start_idx, 10)
+        ma20 = self._calculate_ma(kline_data, start_idx, 20)
+        
+        # 合并所有价格数据进行归一化
+        all_prices = prices.flatten()
+        if ma10 is not None:
+            all_prices = np.concatenate([all_prices, ma10])
+        if ma20 is not None:
+            all_prices = np.concatenate([all_prices, ma20])
+        
         # 归一化价格
-        norm_prices = self._normalize_price_data(prices.flatten()).reshape(prices.shape)
+        norm_prices = self._normalize_price_data(all_prices)
+        
+        # 分离归一化后的数据
+        norm_kline = norm_prices[:len(prices.flatten())].reshape(prices.shape)
+        norm_ma10 = norm_prices[len(prices.flatten()):len(prices.flatten())+self.window_size] if ma10 is not None else None
+        norm_ma20 = norm_prices[-self.window_size:] if ma20 is not None else None
         
         # 计算每根K线的宽度和位置
         bar_width = self.image_width // self.window_size
         
+        # 绘制K线实体
         for i in range(self.window_size):
             x = i * bar_width
             # 在PIL图像中,坐标系原点(0,0)位于左上角,y轴向下为正
             # 而在金融图表中,价格向上增长,所以需要用1减去归一化的价格来反转y轴
-            open_y = int((1 - norm_prices[i, 0]) * self.image_height)
-            close_y = int((1 - norm_prices[i, 1]) * self.image_height)
+            open_y = int((1 - norm_kline[i, 0]) * self.image_height)
+            close_y = int((1 - norm_kline[i, 1]) * self.image_height)
             
             # 绘制实体
             if close_y < open_y:  # 阴线(收盘价低于开盘价)
@@ -83,6 +121,28 @@ class KLineImageEngine:
             else:  # 阳线(收盘价高于等于开盘价) 
                 draw.rectangle([(x, open_y), (x + bar_width, close_y)],
                              outline='white', fill='red')
+        
+        # 绘制均线
+        if norm_ma10 is not None:
+            points = []
+            for i in range(self.window_size):
+                x = i * bar_width + bar_width // 2
+                y = int((1 - norm_ma10[i]) * self.image_height)
+                points.append((x, y))
+            # 使用黄色绘制MA10
+            for i in range(len(points)-1):
+                draw.line([points[i], points[i+1]], fill='yellow', width=2)
+            
+        if norm_ma20 is not None:
+            points = []
+            for i in range(self.window_size):
+                x = i * bar_width + bar_width // 2
+                y = int((1 - norm_ma20[i]) * self.image_height)
+                points.append((x, y))
+            # 使用蓝色绘制MA20
+            for i in range(len(points)-1):
+                draw.line([points[i], points[i+1]], fill='blue', width=2)
+
     def generate_feature(self, 
                         kline_data: List[Any], 
                         idx: int) -> Tuple[Optional[np.ndarray], Optional[str]]:
