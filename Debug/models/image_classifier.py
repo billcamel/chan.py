@@ -117,15 +117,18 @@ class AutoGluonImageClassifier:
         self.predictor = MultiModalPredictor(
             label='label',
             path=self.model_dir,
-            problem_type='classification'
+            problem_type='binary',
+            eval_metric='roc_auc', 
+            presets="high_quality"
         )
 
         # 指定使用 ResNet-50（通过 timm 库）
         hyperparameters = {
-            'model.names': ['timm_image'],  # 使用 timm 图像模型
-            'model.timm_image.checkpoint_name': 'resnet50.a1_in1k',  # ResNet-50 预训练权重
-            'optimization.max_epochs': 10,   # 训练轮次
-            # 'optimization.lr': 1e-4,         # 学习率
+            # 'model.names': ['timm_image'],  # 使用 timm 图像模型
+            "model.mmdet_image.checkpoint_name": 'yolox_s',  # ResNet-50 预训练权重
+            "optimization.max_epochs": 100,   # 训练轮次
+            "optimization.patience":  15,
+            "optimization.learning_rate": 2.0e-4,         # 学习率
             # 'env.per_gpu_batch_size': 32     # 根据显存调整批大小
         }
         
