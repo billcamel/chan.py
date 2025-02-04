@@ -131,7 +131,7 @@ class KLineImageEngine:
                 points.append((x, y))
             # 使用黄色绘制MA10
             for i in range(len(points)-1):
-                draw.line([points[i], points[i+1]], fill='yellow', width=2)
+                draw.line([points[i], points[i+1]], fill='black', width=2)
             
         if norm_ma20 is not None:
             points = []
