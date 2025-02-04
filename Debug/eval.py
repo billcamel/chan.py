@@ -28,6 +28,8 @@ from models.auto_trainer import AutoTrainer
 
 from Debug.models.trade_analyzer import TradeAnalyzer
 from Debug.models.feature_generator import CFeatureGenerator
+from models.image_classifier import AutoGluonImageClassifier
+from models.image_feature_engine import KLineImageEngine
 
 
 def predict_bsp(model, features: Dict, feature_meta: Dict, processor: FeatureProcessor) -> float:
@@ -131,7 +133,7 @@ if __name__ == "__main__":
     本示例展示了如何将策略生成的买卖点与离线模型集成，以进行实盘交易
     """
     code = "BTC/USDT"
-    begin_time = "2024-12-01"
+    begin_time = "2024-01-01"
     end_time = None
     # end_time = "2022-01-01"
     data_src = DATA_SRC.PICKLE
@@ -182,7 +184,25 @@ if __name__ == "__main__":
     
     # 初始化特征引擎
     feature_engine = FeatureEngine()
-
+    
+    # 初始化图像引擎
+    image_engine = KLineImageEngine(
+        window_size=60,
+        image_width=512,
+        image_height=512,
+        output_dir="temp_images"
+    )
+    
+    # 初始化图像分类器（如果有训练好的模型）
+    image_classifier = None
+    image_model_dir = "image_models"  # 图像模型目录
+    if os.path.exists(image_model_dir):
+        try:
+            image_classifier = AutoGluonImageClassifier.load(image_model_dir)
+            print(f"已加载图像分类模型: {image_model_dir}")
+        except Exception as e:
+            print(f"加载图像模型失败: {e}")
+    
     treated_bsp_idx = set()
     kline_data = []  # 存储K线数据用于后续分析
     
@@ -211,10 +231,22 @@ if __name__ == "__main__":
                 **feature_engine.get_features(kline_data, len(kline_data)-1, chan_snapshot),
                 **feature_set.generate_features(chan_snapshot)
             }
-            features.add_feat(market_features)
             
+            features.add_feat(market_features)
             # 预测买卖点的概率
             prob = predict_bsp(model, features.to_dict(), feature_meta, processor)
+
+            # 生成图像特征
+            image_feature, image_name = image_engine.generate_feature(kline_data, len(kline_data)-1)
+            image_prob = 0
+            if image_feature is not None and image_name is not None:                
+                # 如果有图像分类器，添加图像预测结果
+                if image_classifier is not None:
+                    try:
+                        image_path = os.path.join("temp_images", image_name)
+                        image_prob = image_classifier.predict(image_path)
+                    except Exception as e:
+                        print(f"图像预测失败: {e}")
             
             # 记录交易信息
             trade_info = {
@@ -228,7 +260,7 @@ if __name__ == "__main__":
             
             # 打印交易信息
             trade_type = "买入" if last_bsp.is_buy else "卖出"
-            print(f"{trade_info['time']}: {trade_type} 信号, 预测概率={prob:.2%}, 价格={trade_info['price']:.2f}")
+            print(f"{trade_info['time']}: {trade_type} 信号, 预测概率={prob:.2%}, 价格={trade_info['price']:.2f}, 图像概率={image_prob:.2%}")
             
             treated_bsp_idx.add(last_bsp.klu.idx)
     
@@ -236,7 +268,7 @@ if __name__ == "__main__":
     bsp_academy = [bsp.klu.idx for bsp in chan.get_bsp()]
     
     # 创建评估器并寻找最佳阈值
-    evaluator = ModelEvaluator()
+    evaluator = ModelEvaluator(threshold=0.4)
     best_metrics = evaluator.find_best_threshold(trades, bsp_academy)
     
     # 使用最佳阈值的评估结果已经在evaluator中
