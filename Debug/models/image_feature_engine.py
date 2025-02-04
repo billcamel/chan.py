@@ -69,18 +69,17 @@ class KLineImageEngine:
                     image: Image.Image,
                     kline_data: List[Any],
                     start_idx: int) -> None:
-        """在图像上绘制K线
-        
-        Args:
-            image: PIL图像对象
-            kline_data: K线数据
-            start_idx: 起始K线索引
-        """
+        """在图像上绘制K线"""
         draw = ImageDraw.Draw(image)
         
-        # 提取价格数据 - 只使用开盘和收盘价
+        # 提取价格数据和成交量数据
         prices = np.array([
             [k.open, k.close] 
+            for k in kline_data[start_idx:start_idx+self.window_size]
+        ])
+        
+        volumes = np.array([
+            k.trade_info.metric.get('volume', 0) 
             for k in kline_data[start_idx:start_idx+self.window_size]
         ])
         
@@ -95,10 +94,11 @@ class KLineImageEngine:
         if ma20 is not None:
             all_prices = np.concatenate([all_prices, ma20])
         
-        # 归一化价格
+        # 归一化价格和成交量
         norm_prices = self._normalize_price_data(all_prices)
+        norm_volumes = self._normalize_price_data(volumes)
         
-        # 分离归一化后的数据
+        # 分离归一化后的价格数据
         norm_kline = norm_prices[:len(prices.flatten())].reshape(prices.shape)
         norm_ma10 = norm_prices[len(prices.flatten()):len(prices.flatten())+self.window_size] if ma10 is not None else None
         norm_ma20 = norm_prices[-self.window_size:] if ma20 is not None else None
@@ -106,30 +106,49 @@ class KLineImageEngine:
         # 计算每根K线的宽度和位置
         bar_width = self.image_width // self.window_size
         
+        # 分配K线和成交量的显示区域
+        price_height = int(self.image_height * 0.7)  # K线占70%
+        volume_start = price_height + 10  # 成交量起始位置，留出一点间隔
+        volume_height = self.image_height - volume_start - 10  # 成交量区域高度，底部也留出间隔
+        
         # 绘制K线实体
         for i in range(self.window_size):
             x = i * bar_width
-            # 在PIL图像中,坐标系原点(0,0)位于左上角,y轴向下为正
-            # 而在金融图表中,价格向上增长,所以需要用1减去归一化的价格来反转y轴
-            open_y = int((1 - norm_kline[i, 0]) * self.image_height)
-            close_y = int((1 - norm_kline[i, 1]) * self.image_height)
             
-            # 绘制实体
-            if close_y < open_y:  # 阴线(收盘价低于开盘价)
+            # K线部分
+            open_y = int((1 - norm_kline[i, 0]) * price_height)
+            close_y = int((1 - norm_kline[i, 1]) * price_height)
+            
+            # 绘制K线实体
+            if close_y < open_y:  # 阴线
                 draw.rectangle([(x, close_y), (x + bar_width, open_y)],
                              outline='white', fill='green')
-            else:  # 阳线(收盘价高于等于开盘价) 
+            else:  # 阳线
                 draw.rectangle([(x, open_y), (x + bar_width, close_y)],
                              outline='white', fill='red')
+            
+            # 绘制成交量
+            volume_height_px = int(norm_volumes[i] * volume_height)
+            if volume_height_px > 0:  # 确保有成交量才绘制
+                volume_bottom = self.image_height - 10  # 底部位置，留出间隔
+                volume_top = volume_bottom - volume_height_px  # 从底部向上画
+                
+                # 确保 volume_top 不小于 volume_start
+                volume_top = max(volume_top, volume_start)
+                
+                # 成交量柱状图颜色跟随K线颜色
+                volume_color = 'green' if close_y < open_y else 'red'
+                draw.rectangle([(x, volume_top), (x + bar_width, volume_bottom)],
+                             fill=volume_color)
         
         # 绘制均线
         if norm_ma10 is not None:
             points = []
             for i in range(self.window_size):
                 x = i * bar_width + bar_width // 2
-                y = int((1 - norm_ma10[i]) * self.image_height)
+                y = int((1 - norm_ma10[i]) * price_height)
                 points.append((x, y))
-            # 使用黄色绘制MA10
+            # 绘制MA10
             for i in range(len(points)-1):
                 draw.line([points[i], points[i+1]], fill='black', width=2)
             
@@ -137,11 +156,15 @@ class KLineImageEngine:
             points = []
             for i in range(self.window_size):
                 x = i * bar_width + bar_width // 2
-                y = int((1 - norm_ma20[i]) * self.image_height)
+                y = int((1 - norm_ma20[i]) * price_height)
                 points.append((x, y))
-            # 使用蓝色绘制MA20
+            # 绘制MA20
             for i in range(len(points)-1):
                 draw.line([points[i], points[i+1]], fill='blue', width=2)
+            
+        # 绘制分割线
+        draw.line([(0, price_height), (self.image_width, price_height)], 
+                 fill='gray', width=1)
 
     def generate_feature(self, 
                         kline_data: List[Any], 
