@@ -124,8 +124,8 @@ class AutoGluonImageClassifier:
 
         # 指定使用 ResNet-50（通过 timm 库）
         hyperparameters = {
-            # 'model.names': ['timm_image'],  # 使用 timm 图像模型
-            "model.mmdet_image.checkpoint_name": 'yolox_s',  # ResNet-50 预训练权重
+            'model.names': ['timm_image'],  # 使用 timm 图像模型
+            'model.timm_image.checkpoint_name': 'resnet50.a1_in1k', # ResNet-50 预训练权重
             "optimization.max_epochs": 100,   # 训练轮次
             "optimization.patience":  15,
             "optimization.learning_rate": 2.0e-4,         # 学习率
@@ -151,6 +151,18 @@ class AutoGluonImageClassifier:
         print("\n模型评估完成:")
         print(f"验证指标: {val_metrics}")
         print(f"模型路径: {self.model_dir}")
+        # 获取预测概率
+        probs = self.predictor.predict_proba(data_info['train_df'])
+        # 获取真实标签
+        labels = data_info['train_df']['label']
+        # 创建结果DataFrame
+        results_df = pd.DataFrame({
+            'label': labels,
+            'prob': probs.iloc[:, 1]
+        })
+        # 保存到CSV文件
+        results_df.to_csv('train_predictions.csv', index=False)
+        print("预测结果已保存到 train_predictions.csv")
         return results
         
     def predict(self, image_path: str) -> float:
@@ -162,6 +174,9 @@ class AutoGluonImageClassifier:
         Returns:
             预测概率
         """
+        if not os.path.exists(image_path):
+            print(f"图像不存在: {image_path}")
+            return 0
         if self.predictor is None:
             self.predictor = MultiModalPredictor.load(self.model_dir)
             
@@ -170,7 +185,7 @@ class AutoGluonImageClassifier:
         
         # 预测
         probs = self.predictor.predict_proba(test_data)
-        return probs.iloc[0]['ok']  # 返回正类的概率
+        return probs.iloc[0, 1]  # 返回正类的概率
         
     @classmethod
     def load(cls, model_dir: str):
