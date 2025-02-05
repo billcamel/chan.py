@@ -799,41 +799,51 @@ class FasterRCNNClassifier(BaseImageClassifier):
             print(f"训练过程出错: {str(e)}")
             raise
 
-    def predict(self, image_path: str) -> Tuple[int, float]:
-        """预测单个图像"""
+    def predict_batch(self, image_paths: List[str]) -> List[Tuple[int, float]]:
+        """批量预测多个图像
+        
+        Args:
+            image_paths: 图像路径列表
+            
+        Returns:
+            预测结果列表，每个元素为 (预测类别, 预测概率)
+        """
         self.model.eval()
+        results = []
         
         try:
-            # 加载和预处理图像
             transform = transforms.Compose([
                 transforms.Resize((800, 800)),
                 transforms.ToTensor(),
             ])
             
-            image = Image.open(image_path).convert('RGB')
-            image = transform(image).unsqueeze(0).to(self.device)
-            
-            # 预测
-            with torch.no_grad():
-                predictions = self.model([image])
-                pred = predictions[0]
+            # 批量处理图像
+            for img_path in tqdm(image_paths, desc='Predicting'):
+                image = Image.open(img_path).convert('RGB')
+                image = transform(image).unsqueeze(0).to(self.device)
                 
-                if len(pred['boxes']) > 0:
-                    # 获取最高分的预测
-                    scores = pred['scores']
-                    labels = pred['labels']
-                    max_score_idx = torch.argmax(scores)
-                    pred_class = labels[max_score_idx].item()
-                    pred_prob = scores[max_score_idx].item()
-                else:
-                    # 如果没有检测到任何目标，返回默认值
-                    pred_class = 0
-                    pred_prob = 0.0
-                
-            return pred_class, pred_prob
+                with torch.no_grad():
+                    predictions = self.model(image)
+                    pred = predictions[0]
+                    
+                    if len(pred['boxes']) > 0:
+                        # 获取最高分的预测
+                        scores = pred['scores']
+                        labels = pred['labels']
+                        max_score_idx = torch.argmax(scores)
+                        pred_class = labels[max_score_idx].item()
+                        pred_prob = scores[max_score_idx].item()
+                    else:
+                        # 如果没有检测到任何目标，返回默认值
+                        pred_class = 0
+                        pred_prob = 0.0
+                        
+                    results.append((pred_class, pred_prob))
+                    
+            return results
             
         except Exception as e:
-            print(f"预测过程出错: {str(e)}")
+            print(f"批量预测过程出错: {str(e)}")
             raise
 
 class KLineDetectionDataset(Dataset):
