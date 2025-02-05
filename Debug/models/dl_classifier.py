@@ -636,94 +636,6 @@ class FasterRCNNClassifier(BaseImageClassifier):
             print(f"数据准备出错: {str(e)}")
             raise
         
-    def train(self, data_dir: str) -> Dict:
-        """训练检测模型"""
-        print("\n开始训练 Faster R-CNN 模型:")
-        print(f"设备: {self.device}")
-        
-        try:
-            # 准备数据
-            data_info = self._prepare_detection_data(data_dir)
-            train_dataset = KLineDetectionDataset(data_info['train_df'])
-            val_dataset = KLineDetectionDataset(data_info['val_df'])
-            
-            train_loader = DataLoader(
-                train_dataset,
-                batch_size=self.batch_size,
-                shuffle=True,
-                num_workers=2,
-                collate_fn=self._detection_collate_fn,
-                pin_memory=True if torch.cuda.is_available() else False
-            )
-            
-            val_loader = DataLoader(
-                val_dataset,
-                batch_size=self.batch_size,
-                shuffle=False,
-                num_workers=2,
-                collate_fn=self._detection_collate_fn,
-                pin_memory=True if torch.cuda.is_available() else False
-            )
-            
-            # 训练循环
-            best_val_map = 0.0
-            train_losses = []
-            val_maps = []
-            
-            for epoch in range(self.num_epochs):
-                # 训练阶段
-                self.model.train()
-                epoch_loss = 0.0
-                train_bar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{self.num_epochs} [Train]')
-                
-                for images, targets in train_bar:
-                    images = [image.to(self.device) for image in images]
-                    targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
-                    
-                    self.optimizer.zero_grad()
-                    loss_dict = self.model(images, targets)
-                    losses = sum(loss for loss in loss_dict.values())
-                    
-                    losses.backward()
-                    self.optimizer.step()
-                    
-                    epoch_loss += losses.item()
-                    train_bar.set_postfix({'loss': f'{losses.item():.4f}'})
-                
-                epoch_loss = epoch_loss / len(train_loader)
-                train_losses.append(epoch_loss)
-                
-                # 验证阶段
-                val_map = self._evaluate_detection(val_loader)
-                val_maps.append(val_map)
-                
-                # 更新学习率
-                self.scheduler.step(val_map)
-                
-                # 保存最佳模型
-                if val_map > best_val_map:
-                    best_val_map = val_map
-                    torch.save({
-                        'epoch': epoch,
-                        'model_state_dict': self.model.state_dict(),
-                        'optimizer_state_dict': self.optimizer.state_dict(),
-                        'val_map': val_map,
-                    }, os.path.join(self.model_dir, 'best_model.pth'))
-                
-                print(f'\nEpoch {epoch+1}/{self.num_epochs}:')
-                print(f'Train Loss: {epoch_loss:.4f}')
-                print(f'Val mAP: {val_map:.4f}')
-            
-            return {
-                'best_val_map': best_val_map,
-                'train_losses': train_losses,
-                'val_maps': val_maps
-            }
-            
-        except Exception as e:
-            print(f"训练过程出错: {str(e)}")
-            raise
-            
     def _evaluate_detection(self, val_loader) -> float:
         """评估检测模型性能"""
         self.model.eval()
@@ -732,8 +644,15 @@ class FasterRCNNClassifier(BaseImageClassifier):
         
         with torch.no_grad():
             for images, targets in tqdm(val_loader, desc='Evaluating'):
+                # 确保图像和目标在同一设备上
                 images = [image.to(self.device) for image in images]
+                targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
+                
                 predictions = self.model(images)
+                # 将预测结果移到CPU，以便后续处理
+                predictions = [{k: v.cpu() for k, v in p.items()} for p in predictions]
+                targets = [{k: v.cpu() for k, v in t.items()} for t in targets]
+                
                 all_predictions.extend(predictions)
                 all_targets.extend(targets)
                 
@@ -743,12 +662,11 @@ class FasterRCNNClassifier(BaseImageClassifier):
         
     def _calculate_map(self, predictions, targets) -> float:
         """计算平均精度均值(mAP)"""
-        # 简化版mAP计算
         total_ap = 0
-        num_classes = 2  # 二分类问题
+        num_classes = 2
         
         for pred, target in zip(predictions, targets):
-            # 计算IoU
+            # 确保所有张量都在CPU上
             pred_boxes = pred['boxes']
             pred_scores = pred['scores']
             target_boxes = target['boxes']
@@ -756,7 +674,7 @@ class FasterRCNNClassifier(BaseImageClassifier):
             if len(pred_boxes) == 0 or len(target_boxes) == 0:
                 continue
                 
-            # 使用0.5作为IoU阈值
+            # 计算IoU
             ious = self._box_iou(pred_boxes, target_boxes)
             max_ious, _ = ious.max(dim=1)
             
