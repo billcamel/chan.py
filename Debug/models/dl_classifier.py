@@ -710,12 +710,138 @@ class FasterRCNNClassifier(BaseImageClassifier):
             targets.append(target)
         return images, targets
 
+    def train(self, data_dir: str) -> Dict:
+        """训练检测模型"""
+        print("\n开始训练 Faster R-CNN 模型:")
+        print(f"设备: {self.device}")
+        
+        try:
+            # 准备数据
+            data_info = self._prepare_detection_data(data_dir)
+            train_dataset = KLineDetectionDataset(data_info['train_df'])
+            val_dataset = KLineDetectionDataset(data_info['val_df'])
+            
+            train_loader = DataLoader(
+                train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=2,
+                collate_fn=self._detection_collate_fn,
+                pin_memory=True if torch.cuda.is_available() else False
+            )
+            
+            val_loader = DataLoader(
+                val_dataset,
+                batch_size=self.batch_size,
+                shuffle=False,
+                num_workers=2,
+                collate_fn=self._detection_collate_fn,
+                pin_memory=True if torch.cuda.is_available() else False
+            )
+            
+            # 训练循环
+            best_val_map = 0.0
+            train_losses = []
+            val_maps = []
+            
+            for epoch in range(self.num_epochs):
+                # 训练阶段
+                self.model.train()
+                epoch_loss = 0.0
+                train_bar = tqdm(train_loader, desc=f'Epoch {epoch+1}/{self.num_epochs} [Train]')
+                
+                for images, targets in train_bar:
+                    # 确保数据在正确的设备上
+                    images = [image.to(self.device) for image in images]
+                    targets = [{k: v.to(self.device) for k, v in t.items()} for t in targets]
+                    
+                    self.optimizer.zero_grad()
+                    loss_dict = self.model(images, targets)
+                    losses = sum(loss for loss in loss_dict.values())
+                    
+                    losses.backward()
+                    self.optimizer.step()
+                    
+                    epoch_loss += losses.item()
+                    train_bar.set_postfix({'loss': f'{losses.item():.4f}'})
+                
+                epoch_loss = epoch_loss / len(train_loader)
+                train_losses.append(epoch_loss)
+                
+                # 验证阶段
+                val_map = self._evaluate_detection(val_loader)
+                val_maps.append(val_map)
+                
+                # 更新学习率
+                self.scheduler.step(val_map)
+                
+                # 保存最佳模型
+                if val_map > best_val_map:
+                    best_val_map = val_map
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': self.model.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'val_map': val_map,
+                    }, os.path.join(self.model_dir, 'best_model.pth'))
+                
+                print(f'\nEpoch {epoch+1}/{self.num_epochs}:')
+                print(f'Train Loss: {epoch_loss:.4f}')
+                print(f'Val mAP: {val_map:.4f}')
+            
+            return {
+                'best_val_map': best_val_map,
+                'train_losses': train_losses,
+                'val_maps': val_maps
+            }
+            
+        except Exception as e:
+            print(f"训练过程出错: {str(e)}")
+            raise
+
+    def predict(self, image_path: str) -> Tuple[int, float]:
+        """预测单个图像"""
+        self.model.eval()
+        
+        try:
+            # 加载和预处理图像
+            transform = transforms.Compose([
+                transforms.Resize((800, 800)),
+                transforms.ToTensor(),
+            ])
+            
+            image = Image.open(image_path).convert('RGB')
+            image = transform(image).unsqueeze(0).to(self.device)
+            
+            # 预测
+            with torch.no_grad():
+                predictions = self.model([image])
+                pred = predictions[0]
+                
+                if len(pred['boxes']) > 0:
+                    # 获取最高分的预测
+                    scores = pred['scores']
+                    labels = pred['labels']
+                    max_score_idx = torch.argmax(scores)
+                    pred_class = labels[max_score_idx].item()
+                    pred_prob = scores[max_score_idx].item()
+                else:
+                    # 如果没有检测到任何目标，返回默认值
+                    pred_class = 0
+                    pred_prob = 0.0
+                
+            return pred_class, pred_prob
+            
+        except Exception as e:
+            print(f"预测过程出错: {str(e)}")
+            raise
+
 class KLineDetectionDataset(Dataset):
     """K线图像检测数据集"""
     def __init__(self, data_frame: pd.DataFrame, transform=None):
         self.data_frame = data_frame
         self.transform = transform or transforms.Compose([
-            transforms.Resize((800, 800)),  # Faster R-CNN 推荐的输入尺寸
+            transforms.Resize((800, 800)),
             transforms.ToTensor(),
         ])
         
@@ -725,20 +851,17 @@ class KLineDetectionDataset(Dataset):
     def __getitem__(self, idx):
         img_path = self.data_frame.iloc[idx]['image']
         label = self.data_frame.iloc[idx]['label']
+        box = self.data_frame.iloc[idx]['box']  # [x1, y1, x2, y2]
         
         # 读取图像
         image = Image.open(img_path).convert('RGB')
-        
-        # 获取图像尺寸
-        w, h = image.size
         
         # 转换图像
         if self.transform:
             image = self.transform(image)
             
         # 创建检测目标
-        # 这里我们使用整个图像作为目标区域
-        boxes = torch.tensor([[0, 0, w, h]], dtype=torch.float32)
+        boxes = torch.tensor([box], dtype=torch.float32)
         labels = torch.tensor([label], dtype=torch.int64)
         
         target = {
@@ -915,11 +1038,9 @@ if __name__ == "__main__":
                 print(f"F1分数: {f1:.4f}")
                 
                 print("\n混淆矩阵:")
-                print("┌─────────────────────────┐")
-                print("│ 真实\\预测  0   1 │")
-                print(f"│ 类别 0          {confusion_matrix[0][0]:<3} {confusion_matrix[0][1]:<3} │")
-                print(f"│ 类别 1          {confusion_matrix[1][0]:<3} {confusion_matrix[1][1]:<3} │")
-                print("└─────────────────────────┘")
+                print(" 真实\\预测  0   1 │")
+                print(f" 类别 0     {confusion_matrix[0][0]:<3} {confusion_matrix[0][1]:<3} │")
+                print(f" 类别 1     {confusion_matrix[1][0]:<3} {confusion_matrix[1][1]:<3} │")
             
             else:
                 # 无标签文件时只输出预测结果
